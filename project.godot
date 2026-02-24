@@ -11,7 +11,7 @@ config_version=5
 [application]
 
 config/name="Gears2D"
-run/main_scene="uid://b47r4iy5y6o7c"
+run/main_scene="uid://dcjnfunlci5tn"
 config/features=PackedStringArray("4.5", "GL Compatibility")
 config/icon="res://icon.svg"
 
