@@ -1,0 +1,128 @@
+class_name UI
+extends CanvasLayer
+
+signal action_pressed
+signal hand_gear_selected(gear: Node2D)
+
+@onready var player_label: Label = %PlayerLabel
+@onready var phase_label: Label = %PhaseLabel
+@onready var t0_label: Label = %T0Label
+@onready var t1_label: Label = %T1Label
+@onready var action_button: Button = %ActionButton
+@onready var hand_container_player1: HBoxContainer = %HandContainerPlayer1
+@onready var hand_container_player2: HBoxContainer = %HandContainerPlayer2
+@onready var tooltip_panel: Panel = %TooltipPanel
+@onready var tooltip_label: Label = %TooltipLabel
+
+func _ready():
+	action_button.pressed.connect(_on_action_button_pressed)
+	tooltip_panel.hide()
+
+func _on_action_button_pressed():
+	action_pressed.emit()
+
+func update_player(active_player_id: int):
+	player_label.text = "Активный игрок: " + str(active_player_id + 1)
+
+func update_phase(phase: int):
+	var phase_names = ["Построение цепочки", "Upturn", "Разрешение", "Renewal"]
+	phase_label.text = "Фаза: " + phase_names[phase]
+
+func update_t_pool(t0: int, t1: int):
+	t0_label.text = "T1: " + str(t0)
+	t1_label.text = "T2: " + str(t1)
+
+func update_action_button(phase: int, placed: bool = false, active_player_id: int = 0):
+	match phase:
+		0:
+			if placed:
+				action_button.text = "Конец хода Игрок " + str(active_player_id + 1)
+			else:
+				action_button.text = "Пас"
+		1:
+			action_button.text = "Завершить просмотр"
+		2:
+			action_button.text = "Пропустить"
+		_:
+			action_button.text = "Действие"
+
+func update_hands(hand1: Array, hand2: Array, active_player_id: int):
+	for child in hand_container_player1.get_children():
+		child.queue_free()
+	for child in hand_container_player2.get_children():
+		child.queue_free()
+	
+	fill_hand_container(hand_container_player1, hand1, active_player_id == 0)
+	fill_hand_container(hand_container_player2, hand2, active_player_id == 1)
+
+func fill_hand_container(container: HBoxContainer, hand: Array, is_active: bool):
+	for gear in hand:
+		var button = Button.new()
+		var text = gear.gear_name + "\n" + "Bad: " + str(gear.max_bad_ticks) + " Good: " + str(gear.max_good_ticks) + "\n<ability text>"
+		button.text = text
+		button.set_meta("gear", gear)
+		if is_active:
+			button.pressed.connect(_on_hand_button_pressed.bind(gear))
+			button.mouse_entered.connect(_on_hand_button_mouse_entered.bind(gear))
+			button.mouse_exited.connect(_on_hand_button_mouse_exited)
+		else:
+			button.disabled = true
+			button.modulate = Color(0.7, 0.7, 0.7)
+		button.autowrap_mode = TextServer.AUTOWRAP_WORD
+		button.custom_minimum_size = Vector2(120, 80)
+		container.add_child(button)
+
+func _on_hand_button_pressed(gear: Node2D):
+	hand_gear_selected.emit(gear)
+
+func _on_hand_button_mouse_entered(gear: Node2D):
+	var tooltip_text = gear.get_tooltip_text()
+	tooltip_label.text = tooltip_text
+	tooltip_panel.global_position = get_viewport().get_mouse_position() + Vector2(20, 20)
+	tooltip_panel.show()
+
+func _on_hand_button_mouse_exited():
+	tooltip_panel.hide()
+
+func highlight_gear(gear: Node2D):
+	for button in hand_container_player1.get_children():
+		if button.get_meta("gear") == gear:
+			button.modulate = Color.YELLOW
+			return
+	for button in hand_container_player2.get_children():
+		if button.get_meta("gear") == gear:
+			button.modulate = Color.YELLOW
+			return
+
+func unhighlight_gear(gear: Node2D):
+	for button in hand_container_player1.get_children():
+		if button.get_meta("gear") == gear:
+			button.modulate = Color.WHITE if not button.disabled else Color(0.7, 0.7, 0.7)
+			return
+	for button in hand_container_player2.get_children():
+		if button.get_meta("gear") == gear:
+			button.modulate = Color.WHITE if not button.disabled else Color(0.7, 0.7, 0.7)
+			return
+
+func clear_selection():
+	for button in hand_container_player1.get_children():
+		if button.disabled:
+			button.modulate = Color(0.7, 0.7, 0.7)
+		else:
+			button.modulate = Color.WHITE
+	for button in hand_container_player2.get_children():
+		if button.disabled:
+			button.modulate = Color(0.7, 0.7, 0.7)
+		else:
+			button.modulate = Color.WHITE
+
+func show_gear_tooltip(gear: Node2D, mouse_pos: Vector2):
+	print("UI.show_gear_tooltip: позиция мыши=", mouse_pos)
+	tooltip_label.text = gear.get_tooltip_text()
+	tooltip_panel.global_position = Vector2(200, 200)
+	tooltip_panel.show()
+	print("Панель показана, текст: ", tooltip_label.text)
+
+func hide_gear_tooltip():
+	print("UI.hide_gear_tooltip")
+	tooltip_panel.hide()

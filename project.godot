@@ -11,9 +11,14 @@ config_version=5
 [application]
 
 config/name="Gears2D"
-run/main_scene="uid://dcjnfunlci5tn"
+run/main_scene="uid://blu7vn7xirww3"
 config/features=PackedStringArray("4.5", "GL Compatibility")
 config/icon="res://icon.svg"
+
+[display]
+
+window/size/viewport_width=1920
+window/size/viewport_height=1080
 
 [rendering]
 

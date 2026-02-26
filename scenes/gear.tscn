@@ -7,7 +7,6 @@
 radius = 30.0
 
 [node name="Gear" type="Node2D"]
-position = Vector2(300, 300)
 script = ExtResource("1_btfrt")
 
 [node name="Sprite" type="Sprite2D" parent="."]

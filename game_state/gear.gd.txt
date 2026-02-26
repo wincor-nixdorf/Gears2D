@@ -1,8 +1,6 @@
-# Gear.gd (исправленное вращение)
 class_name Gear
 extends Node2D
 
-# Сигналы
 signal rotated(gear: Node2D, old_ticks: int, new_ticks: int)
 signal triggered(gear: Node2D)
 signal destroyed(gear: Node2D)
@@ -10,7 +8,6 @@ signal clicked(gear: Node2D)
 signal mouse_entered(gear: Node2D)
 signal mouse_exited(gear: Node2D)
 
-# Экспортируемые переменные
 @export var gear_name: String = "Generic Gear"
 @export var owner_id: int = 0
 @export var max_good_ticks: int = 3
@@ -18,13 +15,11 @@ signal mouse_exited(gear: Node2D)
 @export var texture_reverse: Texture2D
 @export var texture_obverse: Texture2D
 
-# Внутренние переменные
 var is_face_up: bool = false
 var current_ticks: int = 0
 var is_triggered: bool = false
 var board_position: Vector2i = Vector2i(-1, -1)
 
-# Ссылки на дочерние узлы
 @onready var sprite: Sprite2D = $Sprite
 @onready var click_area: Area2D = $ClickArea
 @onready var collision_shape: CollisionShape2D = $ClickArea/CollisionShape2D
@@ -43,7 +38,6 @@ func _ready():
 	click_area.mouse_entered.connect(_on_mouse_entered)
 	click_area.mouse_exited.connect(_on_mouse_exited)
 
-# --- Настройка размера под клетку ---
 func set_cell_size(cell_size: float, indent: float = 0.9):
 	var spr = get_node_or_null("Sprite")
 	if not spr:
@@ -64,7 +58,6 @@ func set_cell_size(cell_size: float, indent: float = 0.9):
 			collision_shape.shape = new_shape
 		collision_shape.shape.radius = target_size / 2.0
 
-# --- Вращение ---
 func update_rotation():
 	if not sprite:
 		return
@@ -95,7 +88,6 @@ func rotate_counterclockwise(ticks: int = 1) -> bool:
 	rotated.emit(self, old_ticks, current_ticks)
 	return true
 
-# --- Срабатывание и уничтожение ---
 func trigger():
 	if is_triggered:
 		return
@@ -136,7 +128,6 @@ func peek() -> Dictionary:
 		"is_face_up": is_face_up
 	}
 
-# --- Обработка ввода ---
 func _on_click_area_input(viewport: Node, event: InputEvent, shape_idx: int):
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
 		clicked.emit(self)
@@ -151,7 +142,6 @@ func _on_mouse_exited():
 	modulate = Color.WHITE
 	mouse_exited.emit(self)
 
-# --- Новые методы ---
 func randomize_params():
 	max_good_ticks = randi() % 6 + 1
 	max_bad_ticks = randi() % 6 + 1

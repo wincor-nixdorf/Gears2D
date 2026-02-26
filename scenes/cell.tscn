@@ -15,4 +15,11 @@ texture = ExtResource("2_nm02e")
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 shape = SubResource("RectangleShape2D_0s7o3")
 
+[node name="HighlightRect" type="ColorRect" parent="."]
+visible = false
+offset_right = 64.0
+offset_bottom = 64.0
+mouse_filter = 2
+color = Color(0.65457314, 0.44297108, 0.106126174, 0.3)
+
 [connection signal="clicked" from="." to="." method="_on_clicked"]
