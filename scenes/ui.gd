@@ -1,4 +1,4 @@
-# UI.gd
+# ui.gd
 class_name UI
 extends CanvasLayer
 
@@ -14,10 +14,35 @@ signal hand_gear_selected(gear: Node2D)
 @onready var hand_container_player2: HBoxContainer = %HandContainerPlayer2
 @onready var tooltip_panel: Panel = %TooltipPanel
 @onready var tooltip_label: Label = %TooltipLabel
+@onready var round_label: Label = %RoundLabel
+@onready var chain_length_label: Label = %ChainLengthLabel
+@onready var prompt_label: Label = %PromptLabel
+
+# Метки для отображения урона
+@onready var damage0_label: Label = %DamagePlayer0Label
+@onready var damage1_label: Label = %DamagePlayer1Label
+
+# Элементы панели логов
+@onready var log_panel: Panel = %LogPanel
+@onready var log_text: RichTextLabel = %LogText
+@onready var filter_debug: CheckBox = %FilterDebug
+@onready var filter_info: CheckBox = %FilterInfo
+@onready var filter_warning: CheckBox = %FilterWarning
+@onready var filter_error: CheckBox = %FilterError
+@onready var clear_log_button: Button = %ClearLogButton
 
 func _ready():
 	action_button.pressed.connect(_on_action_button_pressed)
 	tooltip_panel.hide()
+	
+	# Подключение к логгеру
+	GameLogger.message_logged.connect(_on_log_message)
+	clear_log_button.pressed.connect(_on_clear_log)
+	# Устанавливаем начальное состояние фильтров (все включены)
+	filter_debug.button_pressed = true
+	filter_info.button_pressed = true
+	filter_warning.button_pressed = true
+	filter_error.button_pressed = true
 
 func _on_action_button_pressed():
 	action_pressed.emit()
@@ -25,46 +50,59 @@ func _on_action_button_pressed():
 func update_player(active_player_id: int):
 	player_label.text = "Активный игрок: " + str(active_player_id + 1)
 
-func update_phase(phase: int):
+func update_phase(phase: Game.GamePhase):
 	var phase_names = ["Построение цепочки", "Upturn", "Разрешение", "Renewal"]
 	phase_label.text = "Фаза: " + phase_names[phase]
 
 func update_t_pool(t0: int, t1: int):
-	t0_label.text = "T1: " + str(t0)
-	t1_label.text = "T2: " + str(t1)
+	t0_label.text = "T: " + str(t0)
+	t1_label.text = "T: " + str(t1)
 
-func update_action_button(phase: int, placed: bool = false, active_player_id: int = 0):
+func update_action_button(phase: Game.GamePhase, placed: bool, active_player_id: int, can_pass: bool):
 	match phase:
-		0:  # CHAIN_BUILDING
+		Game.GamePhase.CHAIN_BUILDING:
 			if placed:
 				action_button.text = "Конец хода Игрок " + str(active_player_id + 1)
+				action_button.disabled = false
 			else:
 				action_button.text = "Пас"
-		1:  # UPTURN
+				action_button.disabled = not can_pass
+		Game.GamePhase.UPTURN:
 			action_button.text = "Завершить просмотр"
-		2:  # CHAIN_RESOLUTION
+			action_button.disabled = false
+		Game.GamePhase.CHAIN_RESOLUTION:
 			action_button.text = "Пропустить"
-		3:  # RENEWAL
-			action_button.text = "Действие"
+			action_button.disabled = false
 		_:
 			action_button.text = "Действие"
+			action_button.disabled = false
+
+func update_round(round: int):
+	round_label.text = "Раунд: " + str(round)
+
+func update_chain_length(length: int):
+	chain_length_label.text = "Цепочка: " + str(length) + " G"
+
+func update_prompt(text: String):
+	prompt_label.text = text
+
+func update_damage(damage0: int, damage1: int):
+	damage0_label.text = str(damage0) + "/" + str(Game.MAX_DAMAGE)
+	damage1_label.text = str(damage1) + "/" + str(Game.MAX_DAMAGE)
 
 func update_hands(hand1: Array, hand2: Array, active_player_id: int):
-	# Очищаем контейнеры
 	for child in hand_container_player1.get_children():
 		child.queue_free()
 	for child in hand_container_player2.get_children():
 		child.queue_free()
 	
-	# Заполняем руку игрока 1
 	fill_hand_container(hand_container_player1, hand1, active_player_id == 0)
-	# Заполняем руку игрока 2
 	fill_hand_container(hand_container_player2, hand2, active_player_id == 1)
 
 func fill_hand_container(container: HBoxContainer, hand: Array, is_active: bool):
 	for gear in hand:
 		var button = Button.new()
-		var text = gear.gear_name + "\n" + "Bad: " + str(gear.max_bad_ticks) + " Good: " + str(gear.max_good_ticks) + "\n<ability text>"
+		var text = gear.gear_name + "\n" + "Tocks: " + str(gear.max_tocks) + " Ticks: " + str(gear.max_ticks) + "\n<ability text>"
 		button.text = text
 		button.set_meta("gear", gear)
 		if is_active:
@@ -84,7 +122,7 @@ func _on_hand_button_pressed(gear: Node2D):
 func _on_hand_button_mouse_entered(gear: Node2D):
 	var tooltip_text = gear.get_tooltip_text()
 	tooltip_label.text = tooltip_text
-	tooltip_panel.global_position = get_viewport().get_mouse_position() + Vector2(20, 20)
+	tooltip_panel.global_position = _adjust_tooltip_position(get_viewport().get_mouse_position())
 	tooltip_panel.show()
 
 func _on_hand_button_mouse_exited():
@@ -123,12 +161,66 @@ func clear_selection():
 			button.modulate = Color.WHITE
 
 func show_gear_tooltip(gear: Node2D, mouse_pos: Vector2):
-	print("UI.show_gear_tooltip: позиция мыши=", mouse_pos)
 	tooltip_label.text = gear.get_tooltip_text()
-	tooltip_panel.global_position = Vector2(200, 200)
+	tooltip_panel.global_position = _adjust_tooltip_position(mouse_pos)
 	tooltip_panel.show()
-	print("Панель показана, текст: ", tooltip_label.text)
 
 func hide_gear_tooltip():
-	print("UI.hide_gear_tooltip")
 	tooltip_panel.hide()
+
+func _adjust_tooltip_position(mouse_pos: Vector2) -> Vector2:
+	var viewport_size = get_viewport().get_visible_rect().size
+	var panel_size = tooltip_panel.get_combined_minimum_size()
+	var offset = Vector2(20, 20)
+
+	var x = mouse_pos.x + offset.x
+	var y = mouse_pos.y + offset.y
+
+	# Проверка правого края
+	if x + panel_size.x > viewport_size.x:
+		x = mouse_pos.x - panel_size.x - offset.x
+	# Проверка левого края
+	if x < 0:
+		x = 0
+
+	# Проверка нижнего края
+	if y + panel_size.y > viewport_size.y:
+		y = mouse_pos.y - panel_size.y - offset.y
+	# Проверка верхнего края
+	if y < 0:
+		y = 0
+
+	return Vector2(x, y)
+
+# ----- Логирование на экран -----
+func _on_log_message(level: int, message: String, timestamp: Dictionary):
+	# Проверка фильтров (уровни: 0-DEBUG, 1-INFO, 2-WARNING, 3-ERROR, 4-PROMPT)
+	var should_show = false
+	match level:
+		0: should_show = filter_debug.button_pressed   # DEBUG
+		1: should_show = filter_info.button_pressed    # INFO
+		2: should_show = filter_warning.button_pressed # WARNING
+		3: should_show = filter_error.button_pressed   # ERROR
+		4: should_show = true  # PROMPT всегда показываем (можно добавить фильтр позже)
+	if not should_show:
+		return
+	
+	# Форматируем время (часы:минуты:секунды)
+	var time_str = "%02d:%02d:%02d" % [timestamp.hour, timestamp.minute, timestamp.second]
+	var color = _get_color_for_level(level)
+	# Добавляем в RichTextLabel с цветом
+	log_text.append_text("[color=%s][%s] %s[/color]\n" % [color, time_str, message])
+	# Автопрокрутка вниз
+	log_text.scroll_to_line(log_text.get_line_count() - 1)
+
+func _get_color_for_level(level: int) -> String:
+	match level:
+		0: return "gray"
+		1: return "white"
+		2: return "yellow"
+		3: return "red"
+		4: return "#00FF00"  # ярко-зелёный для PROMPT
+		_: return "white"
+
+func _on_clear_log():
+	log_text.text = ""

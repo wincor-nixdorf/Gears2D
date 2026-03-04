@@ -25,6 +25,7 @@ grow_horizontal = 0
 grow_vertical = 2
 
 [node name="VBoxContainer" type="VBoxContainer" parent="Control/HBoxContainer"]
+custom_minimum_size = Vector2(400, 0)
 layout_mode = 2
 
 [node name="PlayerLabel" type="Label" parent="Control/HBoxContainer/VBoxContainer"]
@@ -32,20 +33,18 @@ unique_name_in_owner = true
 layout_mode = 2
 text = "PlayerLabel"
 
+[node name="RoundLabel" type="Label" parent="Control/HBoxContainer/VBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+
 [node name="PhaseLabel" type="Label" parent="Control/HBoxContainer/VBoxContainer"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "PhaseLabel"
 
-[node name="T0Label" type="Label" parent="Control/HBoxContainer/VBoxContainer"]
+[node name="ChainLengthLabel" type="Label" parent="Control/HBoxContainer/VBoxContainer"]
 unique_name_in_owner = true
 layout_mode = 2
-text = "T0Label"
-
-[node name="T1Label" type="Label" parent="Control/HBoxContainer/VBoxContainer"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "T1Label"
 
 [node name="ActionButton" type="Button" parent="Control/HBoxContainer/VBoxContainer"]
 unique_name_in_owner = true
@@ -53,27 +52,110 @@ layout_mode = 2
 size_flags_vertical = 0
 text = "ActionButton"
 
-[node name="HandContainerPlayer1" type="HBoxContainer" parent="Control"]
+[node name="PromptLabel" type="Label" parent="Control/HBoxContainer/VBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="VBoxContainer2" type="VBoxContainer" parent="Control/HBoxContainer"]
+custom_minimum_size = Vector2(500, 0)
+layout_mode = 2
+
+[node name="LogPanel" type="Panel" parent="Control/HBoxContainer/VBoxContainer2"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="LogText" type="RichTextLabel" parent="Control/HBoxContainer/VBoxContainer2/LogPanel"]
 unique_name_in_owner = true
 layout_mode = 1
-anchors_preset = 12
-anchor_top = 1.0
+anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
+grow_vertical = 2
+
+[node name="FilterDebug" type="CheckBox" parent="Control/HBoxContainer/VBoxContainer2"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "FilterDebug"
+
+[node name="FilterInfo" type="CheckBox" parent="Control/HBoxContainer/VBoxContainer2"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "FilterInfo"
+
+[node name="FilterWarning" type="CheckBox" parent="Control/HBoxContainer/VBoxContainer2"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "FilterWarning"
+
+[node name="FilterError" type="CheckBox" parent="Control/HBoxContainer/VBoxContainer2"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "FilterError"
+
+[node name="ClearLogButton" type="Button" parent="Control/HBoxContainer/VBoxContainer2"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Clear
+Log"
+
+[node name="InfoContainerPlayer1" type="HBoxContainer" parent="Control"]
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_top = -50.0
+offset_right = 121.0
 grow_vertical = 0
 
-[node name="HandContainerPlayer2" type="HBoxContainer" parent="Control"]
+[node name="VBoxContainerPlayer1" type="VBoxContainer" parent="Control/InfoContainerPlayer1"]
+custom_minimum_size = Vector2(100, 0)
+layout_mode = 2
+
+[node name="DamagePlayer0Label" type="Label" parent="Control/InfoContainerPlayer1/VBoxContainerPlayer1"]
 unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 0
+
+[node name="T0Label" type="Label" parent="Control/InfoContainerPlayer1/VBoxContainerPlayer1"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 0
+text = "T0Label"
+
+[node name="HandContainerPlayer1" type="HBoxContainer" parent="Control/InfoContainerPlayer1"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="InfoContainerPlayer2" type="HBoxContainer" parent="Control"]
 layout_mode = 1
-anchors_preset = 10
-anchor_right = 1.0
-grow_horizontal = 2
+offset_right = 104.0
+offset_bottom = 50.0
+
+[node name="VBoxContainerPlayer2" type="VBoxContainer" parent="Control/InfoContainerPlayer2"]
+custom_minimum_size = Vector2(100, 0)
+layout_mode = 2
+
+[node name="DamagePlayer1Label" type="Label" parent="Control/InfoContainerPlayer2/VBoxContainerPlayer2"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 0
+
+[node name="T1Label" type="Label" parent="Control/InfoContainerPlayer2/VBoxContainerPlayer2"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 0
+text = "T1Label"
+
+[node name="HandContainerPlayer2" type="HBoxContainer" parent="Control/InfoContainerPlayer2"]
+unique_name_in_owner = true
+layout_mode = 2
 
 [node name="TooltipPanel" type="Panel" parent="."]
 unique_name_in_owner = true
 z_index = 1
-custom_minimum_size = Vector2(100, 200)
+custom_minimum_size = Vector2(200, 200)
 offset_left = 1041.0
 offset_top = 147.0
 offset_right = 1152.0

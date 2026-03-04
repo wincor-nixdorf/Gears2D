@@ -1,4 +1,4 @@
-# Player.gd
+# player.gd
 class_name Player
 extends Node
 
