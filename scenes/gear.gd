@@ -105,11 +105,11 @@ func trigger():
 		push_error("Gear: texture_obverse not assigned!")
 	sprite.rotation_degrees = 0
 	triggered.emit(self)
-	GameManager.ref.emit_event(GameEnums.TriggerCondition.ON_TRIGGER, {"gear": self})
+	EventBus.gear_triggered.emit(self)
 
 func destroy():
 	destroyed.emit(self)
-	GameManager.ref.emit_event(GameEnums.TriggerCondition.ON_DESTROYED, {"gear": self})
+	EventBus.gear_destroyed.emit(self)
 	queue_free()
 
 func can_rotate() -> bool:
@@ -118,12 +118,17 @@ func can_rotate() -> bool:
 func is_owned_by(player: int) -> bool:
 	return owner_id == player
 
+func has_ability_id(aid: int) -> bool:
+	for a in abilities:
+		if a.ability_id == aid:
+			return true
+	return false
+
 func get_abilities_description() -> String:
 	if abilities.is_empty():
 		return "No abilities"
 	var desc = ""
 	for ability in abilities:
-		#desc += ability.ability_name + ": " + ability.description + "\n"
 		desc += ability.description + "\n"
 	return desc.strip_edges()
 
@@ -151,7 +156,25 @@ func show_obverse_temporarily():
 		sprite.texture = original_texture
 		sprite.rotation_degrees = original_rotation
 
-# Сигналы ввода
+# Подключение сигналов к GameManager
+func _connect_signals():
+	rotated.connect(GameManager.ref._on_gear_rotated)
+	triggered.connect(GameManager.ref._on_gear_triggered)
+	destroyed.connect(GameManager.ref._on_gear_destroyed)
+	clicked.connect(GameManager.ref._on_gear_clicked)
+	mouse_entered.connect(GameManager.ref._on_gear_mouse_entered)
+	mouse_exited.connect(GameManager.ref._on_gear_mouse_exited)
+
+func _disconnect_signals():
+	if GameManager.ref == null:
+		return
+	rotated.disconnect(GameManager.ref._on_gear_rotated)
+	triggered.disconnect(GameManager.ref._on_gear_triggered)
+	destroyed.disconnect(GameManager.ref._on_gear_destroyed)
+	clicked.disconnect(GameManager.ref._on_gear_clicked)
+	mouse_entered.disconnect(GameManager.ref._on_gear_mouse_entered)
+	mouse_exited.disconnect(GameManager.ref._on_gear_mouse_exited)
+
 func _on_click_area_input(viewport: Node, event: InputEvent, shape_idx: int):
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
 		print("Gear click area input: ", gear_name, " at ", board_position)
@@ -159,9 +182,13 @@ func _on_click_area_input(viewport: Node, event: InputEvent, shape_idx: int):
 		viewport.set_input_as_handled()
 
 func _on_mouse_entered():
+	if GameManager.ref.ui.is_target_selection_active():
+		return
 	modulate = Color(1, 1, 0.8)
 	mouse_entered.emit(self)
 
 func _on_mouse_exited():
+	if GameManager.ref.ui.is_target_selection_active():
+		return
 	modulate = Color.WHITE
 	mouse_exited.emit(self)

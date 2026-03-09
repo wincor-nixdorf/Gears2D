@@ -48,7 +48,22 @@ func return_gear_to_hand(gear: Gear):
 		parent.occupied_gear = null
 	if gear.get_parent():
 		gear.get_parent().remove_child(gear)
+	
+	# Удаляем все модификаторы, наложенные на эту шестерню
+	GameState.effect_system.remove_modifiers_from_target(gear)
+	# Удаляем модификаторы, источником которых является эта шестерня
+	GameManager.ref.unregister_gear_effects(gear)
+	
+	# Сброс состояния
+	gear.current_ticks = 0
+	gear.is_triggered = false
+	gear.is_face_up = false
+	if gear.texture_reverse:
+		gear.sprite.texture = gear.texture_reverse
+	gear.update_rotation()
+	
+	# Отключаем сигналы
+	gear._disconnect_signals()
+	
 	hand.append(gear)
 	add_child(gear)
-	# исправленная строка:
-	GameManager.ref.unregister_gear_effects(gear)

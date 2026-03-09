@@ -31,7 +31,12 @@ signal hand_gear_selected(gear: Node2D)
 @onready var filter_error: CheckBox = %FilterError
 @onready var clear_log_button: Button = %ClearLogButton
 
-@onready var tooltip_icon: TextureRect = %TooltipIcon  # если задали уникальное имя
+@onready var tooltip_icon: TextureRect = %TooltipIcon
+
+# Переменные для выбора цели
+var _target_selection_active: bool = false
+var _current_possible_targets: Array = []
+var _original_colors: Dictionary = {}  # для восстановления подсветки клеток/шестерён
 
 func _ready():
 	action_button.pressed.connect(_on_action_button_pressed)
@@ -43,6 +48,24 @@ func _ready():
 	filter_info.button_pressed = true
 	filter_warning.button_pressed = true
 	filter_error.button_pressed = true
+	
+	# Подключаем сигналы для выбора цели
+	EventBus.target_selection_requested.connect(_on_target_selection_requested)
+	EventBus.target_selection_cancelled.connect(_on_target_selection_cancelled)
+
+func _input(event):
+	if not _target_selection_active:
+		return
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
+		EventBus.target_selection_cancelled.emit()
+		get_viewport().set_input_as_handled()
+		return
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		var clicked_object = _get_clicked_object()
+		if clicked_object and clicked_object in _current_possible_targets:
+			EventBus.target_selected.emit(clicked_object)
+			_clear_target_selection()
+			get_viewport().set_input_as_handled()
 
 func _on_action_button_pressed():
 	action_pressed.emit()
@@ -104,9 +127,7 @@ func _get_scaled_texture(texture: Texture2D, target_size: int) -> Texture2D:
 		return null
 	var image = texture.get_image()
 	if not image:
-		return texture  # если не удалось получить image, возвращаем оригинал
-	# Масштабируем с сохранением пропорций, чтобы вписать в квадрат
-	# (можно обрезать, но лучше сохранить пропорции и добавить отступы, но для простоты ресайзим до квадрата)
+		return texture
 	image.resize(target_size, target_size, Image.INTERPOLATE_LANCZOS)
 	return ImageTexture.create_from_image(image)
 	
@@ -118,7 +139,7 @@ func fill_hand_container(container: HBoxContainer, hand: Array, is_active: bool,
 			icon_texture = gear.texture_obverse
 		
 		if icon_texture:
-			button.icon = _get_scaled_texture(icon_texture, 98)  # уменьшаем до 98
+			button.icon = _get_scaled_texture(icon_texture, 98)
 			button.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
 			button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		
@@ -136,7 +157,7 @@ func fill_hand_container(container: HBoxContainer, hand: Array, is_active: bool,
 			button.modulate = Color(0.7, 0.7, 0.7)
 		
 		button.autowrap_mode = TextServer.AUTOWRAP_WORD
-		button.custom_minimum_size = Vector2(220, 120)  # достаточно высокая для иконки и текста
+		button.custom_minimum_size = Vector2(220, 120)
 		container.add_child(button)
 
 func _on_hand_button_pressed(gear: Node2D):
@@ -144,7 +165,7 @@ func _on_hand_button_pressed(gear: Node2D):
 
 func _on_hand_button_mouse_entered(gear: Gear):
 	var icon_texture
-	if gear.owner_id == GameManager.ref.active_player_id:
+	if gear.owner_id == GameState.active_player_id:
 		icon_texture = gear.texture_obverse
 	else:
 		icon_texture = gear.texture_reverse
@@ -154,7 +175,7 @@ func _on_hand_button_mouse_entered(gear: Gear):
 	tooltip_panel.show()
 
 func show_gear_tooltip(gear: Gear, mouse_pos: Vector2):
-	var icon_texture = gear.sprite.texture  # текущая текстура спрайта
+	var icon_texture = gear.sprite.texture
 	tooltip_icon.texture = _get_scaled_texture(icon_texture, 98)
 	tooltip_label.text = gear.get_tooltip_text()
 	tooltip_panel.global_position = _adjust_tooltip_position(mouse_pos)
@@ -246,3 +267,78 @@ func _get_color_for_level(level: int) -> String:
 
 func _on_clear_log():
 	log_text.text = ""
+
+# ----- Обработка выбора цели -----
+func _on_target_selection_requested(ability: Ability, source: Gear, possible_targets: Array, context: Dictionary):
+	_target_selection_active = true
+	_current_possible_targets = possible_targets
+	
+	# Подсвечиваем возможные цели
+	_highlight_possible_targets(possible_targets)
+	
+	# Показываем сообщение игроку
+	prompt_label.text = "Select target for " + ability.ability_name
+
+func _on_target_selection_cancelled():
+	_clear_target_selection()
+
+func cancel_target_selection():
+	if _target_selection_active:
+		_clear_target_selection()
+		EventBus.target_selection_cancelled.emit()
+
+func _clear_target_selection():
+	_target_selection_active = false
+	_current_possible_targets.clear()
+	_restore_highlights()
+	prompt_label.text = ""
+
+func _highlight_possible_targets(targets: Array):
+	_original_colors.clear()
+	for target in targets:
+		if target is Cell:
+			_original_colors[target] = target.sprite.modulate
+			target.sprite.modulate = Color.GREEN
+		elif target is Gear:
+			_original_colors[target] = target.modulate
+			target.modulate = Color.GREEN
+		elif target is Player:
+			# Можно подсветить что-то связанное с игроком, если есть
+			pass
+
+func _restore_highlights():
+	for obj in _original_colors:
+		if obj is Cell and is_instance_valid(obj):
+			obj.sprite.modulate = _original_colors[obj]
+		elif obj is Gear and is_instance_valid(obj):
+			obj.modulate = _original_colors[obj]
+	_original_colors.clear()
+
+func _get_clicked_object():
+	var viewport = get_viewport()
+	if not viewport:
+		return null
+	var camera = viewport.get_camera_2d()
+	if not camera:
+		return null
+	var space_state = camera.get_viewport().get_world_2d().direct_space_state
+	var mouse_pos = viewport.get_mouse_position()
+	var params = PhysicsPointQueryParameters2D.new()
+	params.position = mouse_pos
+	params.collision_mask = 1
+	var result = space_state.intersect_point(params)
+	if result.size() > 0:
+		var collider = result[0].collider
+		if collider is Cell:
+			return collider
+		elif collider is Gear:
+			return collider
+		elif collider.get_parent() is Cell:
+			return collider.get_parent()
+	return null
+
+func is_target_selection_active() -> bool:
+	return _target_selection_active
+
+func is_valid_target(obj: Object) -> bool:
+	return obj in _current_possible_targets

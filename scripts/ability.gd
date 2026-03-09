@@ -12,3 +12,7 @@ extends Resource
 
 func execute(context: Dictionary):
 	push_error("Ability.execute() not implemented for ", ability_name)
+
+# Возвращает список возможных целей для этой способности в данном контексте.
+func get_possible_targets(context: Dictionary) -> Array:
+	return []

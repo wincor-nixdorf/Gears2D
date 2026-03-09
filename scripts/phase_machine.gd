@@ -1,0 +1,43 @@
+# phase_machine.gd
+class_name PhaseMachine
+extends RefCounted
+
+var current_phase: Phase
+var game_manager: GameManager
+
+func _init(gm: GameManager):
+	game_manager = gm
+
+func change_phase(phase_type: Game.GamePhase) -> void:
+	if current_phase:
+		game_manager.ui.cancel_target_selection()
+		current_phase.exit()
+	
+	match phase_type:
+		Game.GamePhase.CHAIN_BUILDING:
+			current_phase = ChainBuildingPhase.new(game_manager)
+		Game.GamePhase.UPTURN:
+			current_phase = UpturnPhase.new(game_manager)
+		Game.GamePhase.CHAIN_RESOLUTION:
+			current_phase = ResolutionPhase.new(game_manager)
+		Game.GamePhase.RENEWAL:
+			current_phase = RenewalPhase.new(game_manager)
+		_:
+			push_error("Unknown phase type: ", phase_type)
+			return
+	
+	current_phase.enter()
+	GameState.current_phase = phase_type
+	EventBus.phase_changed.emit(-1, phase_type)
+
+func handle_cell_clicked(cell: Cell) -> void:
+	if current_phase:
+		current_phase.handle_cell_clicked(cell)
+
+func handle_gear_clicked(gear: Gear) -> void:
+	if current_phase:
+		current_phase.handle_gear_clicked(gear)
+
+func handle_action_button() -> void:
+	if current_phase:
+		current_phase.handle_action_button()

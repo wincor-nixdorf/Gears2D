@@ -1,0 +1,23 @@
+# upturn_phase.gd
+class_name UpturnPhase
+extends Phase
+
+func enter() -> void:
+	GameLogger.debug("UpturnPhase: enter")
+	game_manager.update_ui()
+
+func handle_gear_clicked(gear: Gear) -> void:
+	var cmd = PeekCommand.new(gear)
+	if cmd.can_execute():
+		cmd.execute()
+	else:
+		if gear.is_owned_by(GameState.active_player_id):
+			GameLogger.warning("Cannot peek at your own gear")
+		elif gear.is_face_up:
+			GameLogger.warning("Gear already flipped")
+		else:
+			GameLogger.warning("Not enough T to peek")
+
+func handle_action_button() -> void:
+	GameLogger.info("Ending upturn phase")
+	game_manager.end_upturn()

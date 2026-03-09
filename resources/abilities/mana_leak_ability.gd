@@ -1,3 +1,4 @@
+# mana_leak_ability.gd
 extends Ability
 
 func _init():
@@ -12,5 +13,6 @@ func execute(context: Dictionary):
 	var target = context.get("target") as Gear
 	var source = context.get("source_gear") as Gear
 	if target and source and target.owner_id != source.owner_id:
-		GameManager.ref.apply_mana_leak(target)
-		GameLogger.info("Mana Leak applied to gear")
+		# Добавляем модификатор prevent_trigger на целевую шестерню
+		GameState.effect_system.add_modifier(target, source, "prevent_trigger")
+		GameLogger.info("Mana Leak applied to gear at " + Game.pos_to_chess(target.board_position))

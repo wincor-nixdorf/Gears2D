@@ -14,10 +14,8 @@ var cell_size: int = Game.CELL_SIZE
 
 func _ready():
 	input_event.connect(_on_input_event)
-	# Настраиваем стили рамок
 	_setup_panel_style(highlight_rect, Color.YELLOW, 2)
 	_setup_panel_style(active_rect, Color.RED, 3)
-	# По умолчанию обе рамки скрыты
 	highlight_rect.visible = false
 	active_rect.visible = false
 
@@ -49,6 +47,7 @@ func _on_input_event(viewport: Node, event: InputEvent, shape_idx: int):
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
 		print("Клик по клетке ", board_pos)
 		clicked.emit(self)
+		viewport.set_input_as_handled()
 
 func is_empty() -> bool:
 	return occupied_gear == null
