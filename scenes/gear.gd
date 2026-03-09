@@ -2,57 +2,62 @@
 class_name Gear
 extends Node2D
 
-signal rotated(gear: Node2D, old_ticks: int, new_ticks: int)
-signal triggered(gear: Node2D)
-signal destroyed(gear: Node2D)
-signal clicked(gear: Node2D)
-signal mouse_entered(gear: Node2D)
-signal mouse_exited(gear: Node2D)
+signal rotated(gear: Gear, old_ticks: int, new_ticks: int)
+signal triggered(gear: Gear)
+signal destroyed(gear: Gear)
+signal clicked(gear: Gear)
+signal mouse_entered(gear: Gear)
+signal mouse_exited(gear: Gear)
 
-@export var gear_name: String = "Generic Gear"
-@export var owner_id: int = 0
-@export var max_ticks: int = 3        # количество тиков до срабатывания
-@export var max_tocks: int = 2        # количество таков до уничтожения
-@export var texture_reverse: Texture2D
-@export var texture_obverse: Texture2D
+var gear_name: String = "Generic Gear"
+var owner_id: int = 0
+var max_ticks: int = 3
+var max_tocks: int = 2
+var texture_reverse: Texture2D
+var texture_obverse: Texture2D
 
 var is_face_up: bool = false
 var current_ticks: int = 0
 var is_triggered: bool = false
 var board_position: Vector2i = Vector2i(-1, -1)
+var abilities: Array[Ability] = []
 
 @onready var sprite: Sprite2D = $Sprite
 @onready var click_area: Area2D = $ClickArea
 @onready var collision_shape: CollisionShape2D = $ClickArea/CollisionShape2D
 
 func _ready():
-	if not sprite:
-		push_error("Gear: Sprite node not found! Check the scene structure.")
-		return
 	if texture_reverse:
 		sprite.texture = texture_reverse
 	else:
 		push_error("Gear: texture_reverse not assigned!")
-	
 	update_rotation()
 	click_area.input_event.connect(_on_click_area_input)
 	click_area.mouse_entered.connect(_on_mouse_entered)
 	click_area.mouse_exited.connect(_on_mouse_exited)
 
+func apply_data(data: GearData):
+	gear_name = data.gear_name
+	max_ticks = data.max_ticks
+	max_tocks = data.max_tocks
+	texture_reverse = data.texture_reverse
+	texture_obverse = data.texture_obverse
+	abilities = data.abilities.duplicate()
+	if sprite:
+		if texture_reverse:
+			sprite.texture = texture_reverse
+		update_rotation()
+
 func set_cell_size(cell_size: float, indent: float = 0.9):
-	var spr = get_node_or_null("Sprite")
+	var spr = $Sprite
 	if not spr:
-		push_error("Gear.set_cell_size: Sprite node not found!")
 		return
-	
 	var target_size = cell_size * indent
-	
 	if spr.texture:
 		var tex_size = spr.texture.get_size()
 		spr.scale = Vector2(target_size / tex_size.x, target_size / tex_size.y)
 	else:
 		spr.scale = Vector2(target_size / 100.0, target_size / 100.0)
-	
 	if collision_shape:
 		if collision_shape.shape == null or not (collision_shape.shape is CircleShape2D):
 			var new_shape = CircleShape2D.new()
@@ -65,7 +70,6 @@ func update_rotation():
 	var angle_deg = current_ticks * 30.0
 	sprite.rotation_degrees = angle_deg
 
-# Прежний rotate_clockwise теперь называется do_tick
 func do_tick(ticks: int = 1) -> bool:
 	if is_triggered:
 		return false
@@ -78,7 +82,6 @@ func do_tick(ticks: int = 1) -> bool:
 	rotated.emit(self, old_ticks, current_ticks)
 	return true
 
-# Прежний rotate_counterclockwise теперь называется do_tock
 func do_tock(ticks: int = 1) -> bool:
 	if is_triggered:
 		return false
@@ -102,79 +105,42 @@ func trigger():
 		push_error("Gear: texture_obverse not assigned!")
 	sprite.rotation_degrees = 0
 	triggered.emit(self)
+	GameManager.ref.emit_event(GameEnums.TriggerCondition.ON_TRIGGER, {"gear": self})
 
 func destroy():
 	destroyed.emit(self)
+	GameManager.ref.emit_event(GameEnums.TriggerCondition.ON_DESTROYED, {"gear": self})
 	queue_free()
 
 func can_rotate() -> bool:
 	return not is_triggered
 
-func ticks_to_trigger() -> int:
-	return max(0, max_ticks - current_ticks)
-
-# Переименовано: ticks_to_destruction -> tocks_to_destruction
-func tocks_to_destruction() -> int:
-	if current_ticks < 0:
-		return max(0, max_tocks + current_ticks)
-	else:
-		return max_tocks
-
-func can_take_ticks(ticks: int) -> int:
-	var available = max_tocks + current_ticks
-	return min(ticks, max(0, available))
-
-func peek() -> Dictionary:
-	return {
-		"max_ticks": max_ticks,
-		"max_tocks": max_tocks,
-		"current_ticks": current_ticks,
-		"is_face_up": is_face_up
-	}
-
-func get_max_tocks() -> int:
-	return max(0, max_tocks + current_ticks)
-
-func get_max_ticks() -> int:
-	return max(0, max_ticks - current_ticks)
-
-# Новый метод для проверки владельца
 func is_owned_by(player: int) -> bool:
 	return owner_id == player
 
-func _on_click_area_input(viewport: Node, event: InputEvent, shape_idx: int):
-	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
-		clicked.emit(self)
-		viewport.set_input_as_handled()  # Помечаем событие как обработанное
-
-func _on_mouse_entered():
-	print("Gear mouse entered, owner=", owner_id)
-	modulate = Color(1, 1, 0.8)
-	mouse_entered.emit(self)
-
-func _on_mouse_exited():
-	print("Gear mouse exited, owner=", owner_id)
-	modulate = Color.WHITE
-	mouse_exited.emit(self)
-
-func randomize_params():
-	max_ticks = randi() % 6 + 1
-	max_tocks = randi() % 6 + 1
-	gear_name = "Gear"
+func get_abilities_description() -> String:
+	if abilities.is_empty():
+		return "No abilities"
+	var desc = ""
+	for ability in abilities:
+		#desc += ability.ability_name + ": " + ability.description + "\n"
+		desc += ability.description + "\n"
+	return desc.strip_edges()
 
 func get_tooltip_text() -> String:
 	var owner_str = "Player 1" if owner_id == 0 else "Player 2"
-	return "Gear: %s\nTocks: %d\nTicks: %d\nTime: %d\nOwner: %s" % [
+	var abilities_desc = get_abilities_description()
+	return "Gear: %s\nTocks: %d\nTicks: %d\nTime: %d\nOwner: %s\n\n%s" % [
 		gear_name,
 		max_tocks,
 		max_ticks,
 		current_ticks,
-		owner_str
+		owner_str,
+		abilities_desc
 	]
 
 func show_obverse_temporarily():
 	if not texture_obverse:
-		push_error("Gear: texture_obverse not assigned!")
 		return
 	var original_texture = sprite.texture
 	var original_rotation = sprite.rotation_degrees
@@ -185,5 +151,17 @@ func show_obverse_temporarily():
 		sprite.texture = original_texture
 		sprite.rotation_degrees = original_rotation
 
-func apply_effect():
-	pass
+# Сигналы ввода
+func _on_click_area_input(viewport: Node, event: InputEvent, shape_idx: int):
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		print("Gear click area input: ", gear_name, " at ", board_position)
+		clicked.emit(self)
+		viewport.set_input_as_handled()
+
+func _on_mouse_entered():
+	modulate = Color(1, 1, 0.8)
+	mouse_entered.emit(self)
+
+func _on_mouse_exited():
+	modulate = Color.WHITE
+	mouse_exited.emit(self)

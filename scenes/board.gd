@@ -2,7 +2,7 @@
 extends Node2D
 
 const BOARD_SHIFT_X = 100
-const BOARD_SHIFT_Y = 200
+const BOARD_SHIFT_Y = 370
 const CELL_SCENE = preload("res://scenes/Cell.tscn")
 
 var cells: Array = []   # двумерный массив клеток

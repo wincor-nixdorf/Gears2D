@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://chpiaemmb4ncy"
-path="res://.godot/imported/Revers.png-f24d4fb7fa6b47fe6004d7dce25db6e3.ctex"
+uid="uid://dkvu6mlpn62ah"
+path="res://.godot/imported/mana_leak.png-539311a064e0dce1cd866033dfbe20b3.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/gears/Revers.png"
-dest_files=["res://.godot/imported/Revers.png-f24d4fb7fa6b47fe6004d7dce25db6e3.ctex"]
+source_file="res://assets/gears/mana_leak.png"
+dest_files=["res://.godot/imported/mana_leak.png-539311a064e0dce1cd866033dfbe20b3.ctex"]
 
 [params]
 

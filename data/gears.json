@@ -1,0 +1,34 @@
+[
+	{
+		"name": "Spring",
+		"texture_reverse": "res://assets/gears/reverse2.png",
+		"texture_obverse": "res://assets/gears/spring.png",
+		"max_ticks": 2,
+		"max_tocks": 4,
+		"abilities": [0]
+	},
+	{
+		"name": "Time Swarm",
+		"texture_reverse": "res://assets/gears/reverse2.png",
+		"texture_obverse": "res://assets/gears/time_swarm.png",
+		"max_ticks": 4,
+		"max_tocks": 5,
+		"abilities": [1]
+	},
+	{
+		"name": "Repeat",
+		"texture_reverse": "res://assets/gears/reverse2.png",
+		"texture_obverse": "res://assets/gears/repeat.png",
+		"max_ticks": 3,
+		"max_tocks": 3,
+		"abilities": [2]
+	},
+	{
+		"name": "Mana Leak",
+		"texture_reverse": "res://assets/gears/reverse2.png",
+		"texture_obverse": "res://assets/gears/mana_leak.png",
+		"max_ticks": 2,
+		"max_tocks": 2,
+		"abilities": [3]
+	}
+]

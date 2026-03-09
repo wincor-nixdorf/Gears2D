@@ -1,10 +1,17 @@
-[gd_scene load_steps=4 format=3 uid="uid://c0nknjujbfwvq"]
+[gd_scene load_steps=5 format=3 uid="uid://c0nknjujbfwvq"]
 
 [ext_resource type="Script" uid="uid://bnqssfpnmsyf7" path="res://scenes/cell.gd" id="1_0s7o3"]
 [ext_resource type="Texture2D" uid="uid://c1ii25jbc0lmc" path="res://assets/board/cell_white_100.png" id="2_0s7o3"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_0s7o3"]
 size = Vector2(64, 64)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_0s7o3"]
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 1, 0, 1)
 
 [node name="Cell" type="Area2D"]
 script = ExtResource("1_0s7o3")
@@ -15,11 +22,15 @@ texture = ExtResource("2_0s7o3")
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 shape = SubResource("RectangleShape2D_0s7o3")
 
-[node name="HighlightRect" type="ColorRect" parent="."]
-visible = false
+[node name="HighlightRect" type="Panel" parent="."]
 offset_right = 64.0
 offset_bottom = 64.0
 mouse_filter = 2
-color = Color(0.65457314, 0.44297108, 0.106126174, 0.3)
+theme_override_styles/panel = SubResource("StyleBoxFlat_0s7o3")
+
+[node name="ActiveRect" type="Panel" parent="."]
+offset_right = 40.0
+offset_bottom = 40.0
+mouse_filter = 2
 
 [connection signal="clicked" from="." to="." method="_on_clicked"]

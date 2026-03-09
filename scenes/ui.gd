@@ -31,14 +31,14 @@ signal hand_gear_selected(gear: Node2D)
 @onready var filter_error: CheckBox = %FilterError
 @onready var clear_log_button: Button = %ClearLogButton
 
+@onready var tooltip_icon: TextureRect = %TooltipIcon  # если задали уникальное имя
+
 func _ready():
 	action_button.pressed.connect(_on_action_button_pressed)
 	tooltip_panel.hide()
 	
-	# Подключение к логгеру
 	GameLogger.message_logged.connect(_on_log_message)
 	clear_log_button.pressed.connect(_on_clear_log)
-	# Устанавливаем начальное состояние фильтров (все включены)
 	filter_debug.button_pressed = true
 	filter_info.button_pressed = true
 	filter_warning.button_pressed = true
@@ -96,15 +96,37 @@ func update_hands(hand1: Array, hand2: Array, active_player_id: int):
 	for child in hand_container_player2.get_children():
 		child.queue_free()
 	
-	fill_hand_container(hand_container_player1, hand1, active_player_id == 0)
-	fill_hand_container(hand_container_player2, hand2, active_player_id == 1)
+	fill_hand_container(hand_container_player1, hand1, active_player_id == 0, 0)
+	fill_hand_container(hand_container_player2, hand2, active_player_id == 1, 1)
 
-func fill_hand_container(container: HBoxContainer, hand: Array, is_active: bool):
+func _get_scaled_texture(texture: Texture2D, target_size: int) -> Texture2D:
+	if not texture:
+		return null
+	var image = texture.get_image()
+	if not image:
+		return texture  # если не удалось получить image, возвращаем оригинал
+	# Масштабируем с сохранением пропорций, чтобы вписать в квадрат
+	# (можно обрезать, но лучше сохранить пропорции и добавить отступы, но для простоты ресайзим до квадрата)
+	image.resize(target_size, target_size, Image.INTERPOLATE_LANCZOS)
+	return ImageTexture.create_from_image(image)
+	
+func fill_hand_container(container: HBoxContainer, hand: Array, is_active: bool, player_id: int):
 	for gear in hand:
 		var button = Button.new()
-		var text = gear.gear_name + "\n" + "Tocks: " + str(gear.max_tocks) + " Ticks: " + str(gear.max_ticks) + "\n<ability text>"
+		var icon_texture = gear.texture_reverse
+		if gear.owner_id == player_id:
+			icon_texture = gear.texture_obverse
+		
+		if icon_texture:
+			button.icon = _get_scaled_texture(icon_texture, 98)  # уменьшаем до 98
+			button.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
+			button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		
+		var abilities_text = gear.get_abilities_description()
+		var text = gear.gear_name + "\n" + "Tocks: " + str(gear.max_tocks) + " Ticks: " + str(gear.max_ticks) + "\n" + abilities_text
 		button.text = text
 		button.set_meta("gear", gear)
+		
 		if is_active:
 			button.pressed.connect(_on_hand_button_pressed.bind(gear))
 			button.mouse_entered.connect(_on_hand_button_mouse_entered.bind(gear))
@@ -112,17 +134,30 @@ func fill_hand_container(container: HBoxContainer, hand: Array, is_active: bool)
 		else:
 			button.disabled = true
 			button.modulate = Color(0.7, 0.7, 0.7)
+		
 		button.autowrap_mode = TextServer.AUTOWRAP_WORD
-		button.custom_minimum_size = Vector2(120, 80)
+		button.custom_minimum_size = Vector2(220, 120)  # достаточно высокая для иконки и текста
 		container.add_child(button)
 
 func _on_hand_button_pressed(gear: Node2D):
 	hand_gear_selected.emit(gear)
 
-func _on_hand_button_mouse_entered(gear: Node2D):
-	var tooltip_text = gear.get_tooltip_text()
-	tooltip_label.text = tooltip_text
+func _on_hand_button_mouse_entered(gear: Gear):
+	var icon_texture
+	if gear.owner_id == GameManager.ref.active_player_id:
+		icon_texture = gear.texture_obverse
+	else:
+		icon_texture = gear.texture_reverse
+	tooltip_icon.texture = _get_scaled_texture(icon_texture, 98)
+	tooltip_label.text = gear.get_tooltip_text()
 	tooltip_panel.global_position = _adjust_tooltip_position(get_viewport().get_mouse_position())
+	tooltip_panel.show()
+
+func show_gear_tooltip(gear: Gear, mouse_pos: Vector2):
+	var icon_texture = gear.sprite.texture  # текущая текстура спрайта
+	tooltip_icon.texture = _get_scaled_texture(icon_texture, 98)
+	tooltip_label.text = gear.get_tooltip_text()
+	tooltip_panel.global_position = _adjust_tooltip_position(mouse_pos)
 	tooltip_panel.show()
 
 func _on_hand_button_mouse_exited():
@@ -160,11 +195,6 @@ func clear_selection():
 		else:
 			button.modulate = Color.WHITE
 
-func show_gear_tooltip(gear: Node2D, mouse_pos: Vector2):
-	tooltip_label.text = gear.get_tooltip_text()
-	tooltip_panel.global_position = _adjust_tooltip_position(mouse_pos)
-	tooltip_panel.show()
-
 func hide_gear_tooltip():
 	tooltip_panel.hide()
 
@@ -176,17 +206,13 @@ func _adjust_tooltip_position(mouse_pos: Vector2) -> Vector2:
 	var x = mouse_pos.x + offset.x
 	var y = mouse_pos.y + offset.y
 
-	# Проверка правого края
 	if x + panel_size.x > viewport_size.x:
 		x = mouse_pos.x - panel_size.x - offset.x
-	# Проверка левого края
 	if x < 0:
 		x = 0
 
-	# Проверка нижнего края
 	if y + panel_size.y > viewport_size.y:
 		y = mouse_pos.y - panel_size.y - offset.y
-	# Проверка верхнего края
 	if y < 0:
 		y = 0
 
@@ -194,23 +220,19 @@ func _adjust_tooltip_position(mouse_pos: Vector2) -> Vector2:
 
 # ----- Логирование на экран -----
 func _on_log_message(level: int, message: String, timestamp: Dictionary):
-	# Проверка фильтров (уровни: 0-DEBUG, 1-INFO, 2-WARNING, 3-ERROR, 4-PROMPT)
 	var should_show = false
 	match level:
-		0: should_show = filter_debug.button_pressed   # DEBUG
-		1: should_show = filter_info.button_pressed    # INFO
-		2: should_show = filter_warning.button_pressed # WARNING
-		3: should_show = filter_error.button_pressed   # ERROR
-		4: should_show = true  # PROMPT всегда показываем (можно добавить фильтр позже)
+		0: should_show = filter_debug.button_pressed
+		1: should_show = filter_info.button_pressed
+		2: should_show = filter_warning.button_pressed
+		3: should_show = filter_error.button_pressed
+		4: should_show = true
 	if not should_show:
 		return
 	
-	# Форматируем время (часы:минуты:секунды)
 	var time_str = "%02d:%02d:%02d" % [timestamp.hour, timestamp.minute, timestamp.second]
 	var color = _get_color_for_level(level)
-	# Добавляем в RichTextLabel с цветом
 	log_text.append_text("[color=%s][%s] %s[/color]\n" % [color, time_str, message])
-	# Автопрокрутка вниз
 	log_text.scroll_to_line(log_text.get_line_count() - 1)
 
 func _get_color_for_level(level: int) -> String:
@@ -219,7 +241,7 @@ func _get_color_for_level(level: int) -> String:
 		1: return "white"
 		2: return "yellow"
 		3: return "red"
-		4: return "#00FF00"  # ярко-зелёный для PROMPT
+		4: return "#00FF00"
 		_: return "white"
 
 func _on_clear_log():

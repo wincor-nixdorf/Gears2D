@@ -6,32 +6,49 @@ extends Node
 @export var owner_id: int = 0
 @export var damage: int = 0
 
-var deck: Array[PackedScene] = []
-var hand: Array[Node2D] = []
+var deck: Array[GearData] = []          # колода из данных (GearData)
+var hand: Array[Gear] = []              # рука из экземпляров Gear
 
-func _init(pid: int = 0, deck_scenes: Array[PackedScene] = []):
+const GEAR_SCENE = preload("res://scenes/Gear.tscn")
+
+func _init(pid: int = 0, deck_data: Array[GearData] = []):
 	player_id = pid
 	owner_id = pid
-	deck = deck_scenes.duplicate()
+	deck = deck_data.duplicate()
 	hand = []
 	deck.shuffle()
 
-func draw_card() -> Node2D:
+func draw_card() -> Gear:
 	if deck.is_empty():
 		return null
-	var gear_scene = deck.pop_front()
-	var gear = gear_scene.instantiate()
+	var gear_data = deck.pop_front()
+	var gear = GEAR_SCENE.instantiate()
+	gear.apply_data(gear_data)
 	gear.owner_id = owner_id
-	gear.randomize_params()
 	hand.append(gear)
+	add_child(gear)          # делаем Gear дочерним узлом игрока (для удобства)
 	return gear
 
 func draw_starting_hand(hand_size: int):
 	for i in range(hand_size):
 		draw_card()
 
-func remove_from_hand(gear: Node2D) -> bool:
+func remove_from_hand(gear: Gear) -> bool:
 	if gear in hand:
 		hand.erase(gear)
+		remove_child(gear)   # убираем из иерархии игрока
 		return true
 	return false
+
+func return_gear_to_hand(gear: Gear):
+	if gear in hand:
+		return
+	var parent = gear.get_parent()
+	if parent is Cell:
+		parent.occupied_gear = null
+	if gear.get_parent():
+		gear.get_parent().remove_child(gear)
+	hand.append(gear)
+	add_child(gear)
+	# исправленная строка:
+	GameManager.ref.unregister_gear_effects(gear)
