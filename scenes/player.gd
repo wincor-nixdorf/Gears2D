@@ -8,8 +8,12 @@ extends Node
 
 var deck: Array[GearData] = []          # колода из данных (GearData)
 var hand: Array[Gear] = []              # рука из экземпляров Gear
+var game_manager: GameManager            # добавлено
 
 const GEAR_SCENE = preload("res://scenes/Gear.tscn")
+
+func set_game_manager(gm: GameManager):
+	game_manager = gm
 
 func _init(pid: int = 0, deck_data: Array[GearData] = []):
 	player_id = pid
@@ -25,8 +29,9 @@ func draw_card() -> Gear:
 	var gear = GEAR_SCENE.instantiate()
 	gear.apply_data(gear_data)
 	gear.owner_id = owner_id
+	gear.set_game_manager(game_manager)  # передаём game_manager
 	hand.append(gear)
-	add_child(gear)          # делаем Gear дочерним узлом игрока (для удобства)
+	add_child(gear)
 	return gear
 
 func draw_starting_hand(hand_size: int):
@@ -36,7 +41,7 @@ func draw_starting_hand(hand_size: int):
 func remove_from_hand(gear: Gear) -> bool:
 	if gear in hand:
 		hand.erase(gear)
-		remove_child(gear)   # убираем из иерархии игрока
+		remove_child(gear)
 		return true
 	return false
 
@@ -52,7 +57,8 @@ func return_gear_to_hand(gear: Gear):
 	# Удаляем все модификаторы, наложенные на эту шестерню
 	GameState.effect_system.remove_modifiers_from_target(gear)
 	# Удаляем модификаторы, источником которых является эта шестерня
-	GameManager.ref.unregister_gear_effects(gear)
+	if game_manager:
+		game_manager.unregister_gear_effects(gear)
 	
 	# Сброс состояния
 	gear.current_ticks = 0

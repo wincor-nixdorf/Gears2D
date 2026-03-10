@@ -4,9 +4,11 @@ extends RefCounted
 
 var current_phase: Phase
 var game_manager: GameManager
+var game_state: GameState
 
-func _init(gm: GameManager):
+func _init(gm: GameManager, gs: GameState):
 	game_manager = gm
+	game_state = gs
 
 func change_phase(phase_type: Game.GamePhase) -> void:
 	if current_phase:
@@ -15,19 +17,19 @@ func change_phase(phase_type: Game.GamePhase) -> void:
 	
 	match phase_type:
 		Game.GamePhase.CHAIN_BUILDING:
-			current_phase = ChainBuildingPhase.new(game_manager)
+			current_phase = ChainBuildingPhase.new(game_manager, game_state)
 		Game.GamePhase.UPTURN:
-			current_phase = UpturnPhase.new(game_manager)
+			current_phase = UpturnPhase.new(game_manager, game_state)
 		Game.GamePhase.CHAIN_RESOLUTION:
-			current_phase = ResolutionPhase.new(game_manager)
+			current_phase = ResolutionPhase.new(game_manager, game_state)
 		Game.GamePhase.RENEWAL:
-			current_phase = RenewalPhase.new(game_manager)
+			current_phase = RenewalPhase.new(game_manager, game_state)
 		_:
 			push_error("Unknown phase type: ", phase_type)
 			return
 	
 	current_phase.enter()
-	GameState.current_phase = phase_type
+	game_state.current_phase = phase_type
 	EventBus.phase_changed.emit(-1, phase_type)
 
 func handle_cell_clicked(cell: Cell) -> void:

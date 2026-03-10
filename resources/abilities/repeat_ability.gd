@@ -13,7 +13,7 @@ func execute(context: Dictionary):
 	if not gear:
 		return
 	
-	var gm = GameManager.ref
+	var gm = game_manager  # используем переданный game_manager
 	# Проверяем, не использовалась ли уже эта способность на данной G в текущем разрешении
 	if gm.is_ability_used_on_gear(gear, self.ability_id):
 		GameLogger.debug("Repeat already used on this gear this round, ignoring")

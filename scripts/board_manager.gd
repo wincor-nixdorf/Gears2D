@@ -101,6 +101,11 @@ func set_cell_active(pos: Vector2i, active: bool):
 	if cell:
 		cell.set_active(active)
 
+func reset_chain_highlights():
+	for row in cells:
+		for cell in row:
+			cell.set_highlighted(false)
+			
 # Получить стартовые позиции для игрока (для первого раунда)
 func get_start_positions_for_player(player: int) -> Array[Vector2i]:
 	if player == 0:

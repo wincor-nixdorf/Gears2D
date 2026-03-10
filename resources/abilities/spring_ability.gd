@@ -20,12 +20,12 @@ func execute(context: Dictionary):
 		GameLogger.debug("Spring: target must be enemy gear")
 		return
 	
-	# Нельзя вернуть шестерню из текущей цепочки (опционально)
-	if GameState.chain_graph.has_vertex(target.board_position):
+	# Нельзя вернуть шестерню из текущей цепочки
+	if game_manager.game_state.chain_graph.has_vertex(target.board_position):
 		GameLogger.debug("Spring: target is in current chain, cannot return")
 		return
 	
-	var owner = GameManager.ref.players[target.owner_id]
+	var owner = game_manager.get_players()[target.owner_id]  # заменим на метод get_players()
 	owner.return_gear_to_hand(target)
 	GameLogger.info("Spring returned enemy gear %s to opponent's hand" % target.gear_name)
 
@@ -35,8 +35,8 @@ func get_possible_targets(context: Dictionary) -> Array:
 		return []
 	
 	var result = []
-	for gear in GameManager.ref.board_manager.get_all_gears():
+	for gear in game_manager.get_board_manager().get_all_gears():
 		# Вражеская шестерня, не в текущей цепочке
-		if gear.owner_id != source.owner_id and not GameState.chain_graph.has_vertex(gear.board_position):
+		if gear.owner_id != source.owner_id and not game_manager.game_state.chain_graph.has_vertex(gear.board_position):
 			result.append(gear)
 	return result

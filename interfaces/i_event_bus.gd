@@ -1,7 +1,8 @@
-# event_bus.gd
+# i_event_bus.gd
+class_name IEventBus
 extends Node
 
-# Сигналы основных игровых событий
+# Сигналы (будут унаследованы реальным классом)
 signal phase_changed(old_phase: Game.GamePhase, new_phase: Game.GamePhase)
 signal player_changed(active_player_id: int)
 signal t_pool_updated(t0: int, t1: int)
@@ -19,4 +20,15 @@ signal static_effect_unregistered(source: Node, effect: AbilityEffect)
 signal target_selection_requested(ability: Ability, source: Gear, possible_targets: Array, context: Dictionary)
 signal target_selected(target: Object)
 signal target_selection_cancelled()
-signal gear_resolved(gear: Gear, was_face_up: bool)
+signal gear_resolved(gear: Gear)
+
+# Методы для эмиссии сигналов (если нужны)
+# В реальном классе они не нужны, так как сигналы можно вызывать напрямую
+# Но для единообразия можно объявить виртуальные методы
+func emit_phase_changed(old_phase, new_phase) -> void:
+	push_error("IEventBus.emit_phase_changed() not implemented")
+
+func emit_player_changed(active_player_id) -> void:
+	push_error("IEventBus.emit_player_changed() not implemented")
+
+# ... аналогично для всех сигналов (можно не добавлять, если мы будем использовать прямые emit)

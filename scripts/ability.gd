@@ -2,6 +2,10 @@
 class_name Ability
 extends Resource
 
+var game_manager: GameManager
+var effect_system: EffectSystem
+var event_bus: EventBus
+
 @export var ability_id: int                # GameEnums.AbilityID
 @export var ability_name: String = ""
 @export var ability_type: GameEnums.AbilityType
@@ -9,6 +13,12 @@ extends Resource
 @export var activation_cost: int = 0
 @export var target_type: GameEnums.TargetType = GameEnums.TargetType.NO_TARGET
 @export var description: String = ""
+
+# Инициализация зависимостей
+func init(gm: GameManager, es: EffectSystem, eb: EventBus):
+	game_manager = gm
+	effect_system = es
+	event_bus = eb
 
 func execute(context: Dictionary):
 	push_error("Ability.execute() not implemented for ", ability_name)

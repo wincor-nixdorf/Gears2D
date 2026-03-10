@@ -3,12 +3,14 @@ class_name RoundManager
 extends RefCounted
 
 var game_manager: GameManager
+var game_state: GameState
 var board_manager: BoardManager
 var phase_machine: PhaseMachine
 var ui: UI
 
-func _init(gm: GameManager):
+func _init(gm: GameManager, gs: GameState):
 	game_manager = gm
+	game_state = gs
 	board_manager = gm.board_manager
 	phase_machine = gm.phase_machine
 	ui = gm.ui
@@ -16,15 +18,15 @@ func _init(gm: GameManager):
 func start_round():
 	game_manager.set_active_cell(Vector2i(-1, -1))
 	game_manager.clear_used_abilities()
-	GameState.start_player_id = GameState.active_player_id
-	GameLogger.info("=== Round %d. Active player: %d ===" % [GameState.round_number, GameState.active_player_id + 1])
-	GameState.chain_graph.clear()
-	GameState.last_cell_pos = Vector2i(-1, -1)
-	GameState.last_from_pos = Vector2i(-1, -1)
-	GameState.passed = false
-	GameState.has_placed_this_turn = false
-	GameState.moves_in_round = 0
-	GameState.selected_gear = null
+	game_state.start_player_id = game_state.active_player_id
+	GameLogger.info("=== Round %d. Active player: %d ===" % [game_state.round_number, game_state.active_player_id + 1])
+	game_state.chain_graph.clear()
+	game_state.last_cell_pos = Vector2i(-1, -1)
+	game_state.last_from_pos = Vector2i(-1, -1)
+	game_state.passed = false
+	game_state.has_placed_this_turn = false
+	game_state.moves_in_round = 0
+	game_state.selected_gear = null
 	ui.clear_selection()
 	phase_machine.change_phase(Game.GamePhase.CHAIN_BUILDING)
 	game_manager.update_ui()
@@ -34,10 +36,10 @@ func end_chain_resolution():
 	phase_machine.change_phase(Game.GamePhase.RENEWAL)
 	GameLogger.info("Chain resolution phase ended. Starting renewal.")
 	for i in [0,1]:
-		var damage = GameState.t_pool[i]
+		var damage = game_state.t_pool[i]
 		game_manager.players[1-i].damage += damage
-		GameState.t_pool[i] = 0
-	EventBus.t_pool_updated.emit(GameState.t_pool[0], GameState.t_pool[1])
+		game_state.t_pool[i] = 0
+	EventBus.t_pool_updated.emit(game_state.t_pool[0], game_state.t_pool[1])
 	
 	for p in game_manager.players:
 		if p.damage >= Game.MAX_DAMAGE:
@@ -47,9 +49,9 @@ func end_chain_resolution():
 	for p in game_manager.players:
 		p.draw_card()
 	
-	GameState.active_player_id = 1 - GameState.start_player_id
-	GameState.round_number += 1
-	EventBus.player_changed.emit(GameState.active_player_id)
+	game_state.active_player_id = 1 - game_state.start_player_id
+	game_state.round_number += 1
+	EventBus.player_changed.emit(game_state.active_player_id)
 	start_round()
 
 func end_game(winner_id: int):

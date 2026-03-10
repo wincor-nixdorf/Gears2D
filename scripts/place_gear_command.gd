@@ -6,7 +6,8 @@ var cell: Cell
 var player: Player
 var gear: Gear
 
-func _init(p_cell: Cell, p_player: Player, p_gear: Gear):
+func _init(p_cell: Cell, p_player: Player, p_gear: Gear, gm: GameManager, gs: GameState):
+	super(gm, gs)
 	cell = p_cell
 	player = p_player
 	gear = p_gear
@@ -26,20 +27,16 @@ func execute() -> void:
 	gear.set_cell_size(Game.CELL_SIZE, Game.CELL_INDENT)
 	gear.board_position = cell.board_pos
 	
-	# Подключаем сигналы (если они уже были отключены)
 	gear._connect_signals()
 	
 	EventBus.gear_placed.emit(gear, cell)
 	
-	# Добавляем ресурс T
-	GameState.t_pool[GameState.active_player_id] += 1
-	EventBus.t_pool_updated.emit(GameState.t_pool[0], GameState.t_pool[1])
+	game_state.t_pool[game_state.active_player_id] += 1
+	EventBus.t_pool_updated.emit(game_state.t_pool[0], game_state.t_pool[1])
 	
-	# Добавляем вершину в граф (ребро будет добавлено позже в chain_building_phase)
-	GameState.chain_graph.add_vertex(cell.board_pos)
+	game_state.chain_graph.add_vertex(cell.board_pos)
 	
-	# Помечаем, что ход сделан (но last_cell_pos обновится позже)
-	GameState.has_placed_this_turn = true
-	GameState.moves_in_round += 1
+	game_state.has_placed_this_turn = true
+	game_state.moves_in_round += 1
 	
 	GameLogger.debug("Gear '%s' placed on board at %s" % [gear.gear_name, Game.pos_to_chess(cell.board_pos)])

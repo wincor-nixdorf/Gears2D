@@ -22,9 +22,14 @@ var is_triggered: bool = false
 var board_position: Vector2i = Vector2i(-1, -1)
 var abilities: Array[Ability] = []
 
+var game_manager: GameManager
+
 @onready var sprite: Sprite2D = $Sprite
 @onready var click_area: Area2D = $ClickArea
 @onready var collision_shape: CollisionShape2D = $ClickArea/CollisionShape2D
+
+func set_game_manager(gm: GameManager):
+	game_manager = gm
 
 func _ready():
 	if texture_reverse:
@@ -104,6 +109,9 @@ func trigger():
 	else:
 		push_error("Gear: texture_obverse not assigned!")
 	sprite.rotation_degrees = 0
+	# Скрываем тултип, если он был показан
+	if game_manager:
+		game_manager.ui.hide_gear_tooltip()
 	triggered.emit(self)
 	EventBus.gear_triggered.emit(self)
 
@@ -158,22 +166,24 @@ func show_obverse_temporarily():
 
 # Подключение сигналов к GameManager
 func _connect_signals():
-	rotated.connect(GameManager.ref._on_gear_rotated)
-	triggered.connect(GameManager.ref._on_gear_triggered)
-	destroyed.connect(GameManager.ref._on_gear_destroyed)
-	clicked.connect(GameManager.ref._on_gear_clicked)
-	mouse_entered.connect(GameManager.ref._on_gear_mouse_entered)
-	mouse_exited.connect(GameManager.ref._on_gear_mouse_exited)
+	if not game_manager:
+		return
+	rotated.connect(game_manager._on_gear_rotated)
+	triggered.connect(game_manager._on_gear_triggered)
+	destroyed.connect(game_manager._on_gear_destroyed)
+	clicked.connect(game_manager._on_gear_clicked)
+	mouse_entered.connect(game_manager._on_gear_mouse_entered)
+	mouse_exited.connect(game_manager._on_gear_mouse_exited)
 
 func _disconnect_signals():
-	if GameManager.ref == null:
+	if not game_manager:
 		return
-	rotated.disconnect(GameManager.ref._on_gear_rotated)
-	triggered.disconnect(GameManager.ref._on_gear_triggered)
-	destroyed.disconnect(GameManager.ref._on_gear_destroyed)
-	clicked.disconnect(GameManager.ref._on_gear_clicked)
-	mouse_entered.disconnect(GameManager.ref._on_gear_mouse_entered)
-	mouse_exited.disconnect(GameManager.ref._on_gear_mouse_exited)
+	rotated.disconnect(game_manager._on_gear_rotated)
+	triggered.disconnect(game_manager._on_gear_triggered)
+	destroyed.disconnect(game_manager._on_gear_destroyed)
+	clicked.disconnect(game_manager._on_gear_clicked)
+	mouse_entered.disconnect(game_manager._on_gear_mouse_entered)
+	mouse_exited.disconnect(game_manager._on_gear_mouse_exited)
 
 func _on_click_area_input(viewport: Node, event: InputEvent, shape_idx: int):
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
@@ -182,13 +192,13 @@ func _on_click_area_input(viewport: Node, event: InputEvent, shape_idx: int):
 		viewport.set_input_as_handled()
 
 func _on_mouse_entered():
-	if GameManager.ref.ui.is_target_selection_active():
+	if game_manager and game_manager.ui.is_target_selection_active():
 		return
 	modulate = Color(1, 1, 0.8)
 	mouse_entered.emit(self)
 
 func _on_mouse_exited():
-	if GameManager.ref.ui.is_target_selection_active():
+	if game_manager and game_manager.ui.is_target_selection_active():
 		return
 	modulate = Color.WHITE
 	mouse_exited.emit(self)

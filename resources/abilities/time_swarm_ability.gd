@@ -1,3 +1,4 @@
+# time_swarm_ability.gd
 extends Ability
 
 func _init():
@@ -12,12 +13,11 @@ func execute(context: Dictionary):
 		return
 	
 	# Добавляем модификатор "no_auto_tick" на все текущие вражеские шестерни
-	for enemy_gear in GameManager.ref.board_manager.get_all_gears():
+	for enemy_gear in game_manager.get_board_manager().get_all_gears():
 		if enemy_gear.owner_id != source_gear.owner_id:
-			GameState.effect_system.add_modifier(enemy_gear, source_gear, "no_auto_tick")
+			effect_system.add_modifier(enemy_gear, source_gear, "no_auto_tick")
 	
 	# Помечаем, что эта шестерня является источником Time Swarm (для будущих размещений)
-	# Можно добавить модификатор на самого себя, чтобы потом легко найти все источники
-	GameState.effect_system.add_modifier(source_gear, source_gear, "time_swarm_source")
+	effect_system.add_modifier(source_gear, source_gear, "time_swarm_source")
 	
 	GameLogger.debug("Time Swarm activated from gear %s" % source_gear.gear_name)

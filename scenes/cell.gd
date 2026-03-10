@@ -11,6 +11,7 @@ var cell_size: int = Game.CELL_SIZE
 @onready var sprite: Sprite2D = $Sprite
 @onready var highlight_rect: Panel = $HighlightRect
 @onready var active_rect: Panel = $ActiveRect
+@onready var collision_shape: CollisionShape2D = $CollisionShape2D
 
 func _ready():
 	input_event.connect(_on_input_event)
@@ -42,6 +43,8 @@ func set_highlight_size(size: int):
 	if active_rect:
 		active_rect.position = -Vector2(cell_size/2, cell_size/2)
 		active_rect.size = Vector2(cell_size, cell_size)
+	if collision_shape and collision_shape.shape is RectangleShape2D:
+		collision_shape.shape.size = Vector2(cell_size, cell_size)
 
 func _on_input_event(viewport: Node, event: InputEvent, shape_idx: int):
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:

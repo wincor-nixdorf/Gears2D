@@ -71,11 +71,11 @@ func _on_action_button_pressed():
 	action_pressed.emit()
 
 func update_player(active_player_id: int):
-	player_label.text = "Активный игрок: " + str(active_player_id + 1)
+	player_label.text = "Active Player: " + str(active_player_id + 1)
 
 func update_phase(phase: Game.GamePhase):
-	var phase_names = ["Построение цепочки", "Upturn", "Разрешение", "Renewal"]
-	phase_label.text = "Фаза: " + phase_names[phase]
+	var phase_names = ["Chain Building", "Upturn", "Resolution", "Renewal"]
+	phase_label.text = "Phase: " + phase_names[phase]
 
 func update_t_pool(t0: int, t1: int):
 	t0_label.text = "T: " + str(t0)
@@ -85,26 +85,26 @@ func update_action_button(phase: Game.GamePhase, placed: bool, active_player_id:
 	match phase:
 		Game.GamePhase.CHAIN_BUILDING:
 			if placed:
-				action_button.text = "Конец хода Игрок " + str(active_player_id + 1)
+				action_button.text = "End Turn (Player " + str(active_player_id + 1) + ")"
 				action_button.disabled = false
 			else:
-				action_button.text = "Пас"
+				action_button.text = "Pass"
 				action_button.disabled = not can_pass
 		Game.GamePhase.UPTURN:
-			action_button.text = "Завершить просмотр"
+			action_button.text = "End Peek"
 			action_button.disabled = false
 		Game.GamePhase.CHAIN_RESOLUTION:
-			action_button.text = "Пропустить"
+			action_button.text = "Skip"
 			action_button.disabled = false
 		_:
-			action_button.text = "Действие"
+			action_button.text = "Action"
 			action_button.disabled = false
 
 func update_round(round: int):
-	round_label.text = "Раунд: " + str(round)
+	round_label.text = "Round: " + str(round)
 
 func update_chain_length(length: int):
-	chain_length_label.text = "Цепочка: " + str(length) + " G"
+	chain_length_label.text = "Chain: " + str(length) + " G"
 
 func update_prompt(text: String):
 	prompt_label.text = text
@@ -270,6 +270,11 @@ func _on_clear_log():
 
 # ----- Обработка выбора цели -----
 func _on_target_selection_requested(ability: Ability, source: Gear, possible_targets: Array, context: Dictionary):
+	if _target_selection_active:
+		print("=== UI: target selection already active, ignoring new request for ability ", ability.ability_name)
+		return
+	print("=== UI: _on_target_selection_requested for ability ", ability.ability_name)
+	print("   Possible targets: ", possible_targets)
 	_target_selection_active = true
 	_current_possible_targets = possible_targets
 	
@@ -280,6 +285,7 @@ func _on_target_selection_requested(ability: Ability, source: Gear, possible_tar
 	prompt_label.text = "Select target for " + ability.ability_name
 
 func _on_target_selection_cancelled():
+	print("=== UI: _on_target_selection_cancelled")
 	_clear_target_selection()
 
 func cancel_target_selection():
@@ -288,30 +294,46 @@ func cancel_target_selection():
 		EventBus.target_selection_cancelled.emit()
 
 func _clear_target_selection():
+	print("=== UI: _clear_target_selection, target_selection_active was: ", _target_selection_active)
 	_target_selection_active = false
 	_current_possible_targets.clear()
 	_restore_highlights()
 	prompt_label.text = ""
 
 func _highlight_possible_targets(targets: Array):
+	print("=== UI: _highlight_possible_targets called with targets: ", targets)
 	_original_colors.clear()
 	for target in targets:
 		if target is Cell:
 			_original_colors[target] = target.sprite.modulate
+			print("   Saving color for cell at ", target.board_pos, ": ", target.sprite.modulate)
 			target.sprite.modulate = Color.GREEN
+			print("   New color: ", target.sprite.modulate)
 		elif target is Gear:
 			_original_colors[target] = target.modulate
+			print("   Saving color for gear: ", target.gear_name, " at ", target.board_position, ": ", target.modulate)
 			target.modulate = Color.GREEN
+			print("   New color: ", target.modulate)
 		elif target is Player:
 			# Можно подсветить что-то связанное с игроком, если есть
 			pass
+	print("   _original_colors size: ", _original_colors.size())
 
 func _restore_highlights():
+	print("=== UI: _restore_highlights, _original_colors size: ", _original_colors.size())
 	for obj in _original_colors:
-		if obj is Cell and is_instance_valid(obj):
+		var valid = is_instance_valid(obj)
+		print("   Object: ", obj, " valid: ", valid)
+		if not valid:
+			continue
+		if obj is Cell:
+			print("   Restoring cell at ", obj.board_pos, " to color: ", _original_colors[obj])
 			obj.sprite.modulate = _original_colors[obj]
-		elif obj is Gear and is_instance_valid(obj):
+			print("   Actual color after restore: ", obj.sprite.modulate)
+		elif obj is Gear:
+			print("   Restoring gear: ", obj.gear_name, " to color: ", _original_colors[obj])
 			obj.modulate = _original_colors[obj]
+			print("   Actual color after restore: ", obj.modulate)
 	_original_colors.clear()
 
 func _get_clicked_object():

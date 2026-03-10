@@ -2,6 +2,13 @@
 class_name GameCommand
 extends RefCounted
 
+var game_manager: GameManager
+var game_state: GameState
+
+func _init(gm: GameManager, gs: GameState):
+	game_manager = gm
+	game_state = gs
+
 func can_execute() -> bool:
 	return false
 

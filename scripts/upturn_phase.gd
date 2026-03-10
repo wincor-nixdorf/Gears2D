@@ -7,11 +7,11 @@ func enter() -> void:
 	game_manager.update_ui()
 
 func handle_gear_clicked(gear: Gear) -> void:
-	var cmd = PeekCommand.new(gear)
+	var cmd = PeekCommand.new(gear, game_manager, game_state)
 	if cmd.can_execute():
 		cmd.execute()
 	else:
-		if gear.is_owned_by(GameState.active_player_id):
+		if gear.is_owned_by(game_state.active_player_id):
 			GameLogger.warning("Cannot peek at your own gear")
 		elif gear.is_face_up:
 			GameLogger.warning("Gear already flipped")
