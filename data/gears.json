@@ -30,5 +30,13 @@
 		"max_ticks": 2,
 		"max_tocks": 2,
 		"abilities": [3]
-	}
+	},
+	{
+	"name": "Spark",
+	"texture_reverse": "res://assets/gears/reverse2.png",
+	"texture_obverse": "res://assets/gears/spark.png",
+	"max_ticks": 1,
+	"max_tocks": 1,
+	"abilities": [4]
+}
 ]

@@ -40,6 +40,10 @@ func handle_gear_clicked(gear: Gear) -> void:
 	if current_phase:
 		current_phase.handle_gear_clicked(gear)
 
+func handle_player_clicked(player: Player) -> void:
+	if current_phase:
+		current_phase.handle_player_clicked(player)
+
 func handle_action_button() -> void:
 	if current_phase:
 		current_phase.handle_action_button()

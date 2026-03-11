@@ -21,7 +21,9 @@ func can_execute() -> bool:
 	return true
 
 func execute() -> void:
-	var success = gear.do_tock(amount)
+	print("TakeTCommand: about to call do_tock on ", gear.gear_name)
+	var success = await gear.do_tock(amount)
+	print("TakeTCommand: do_tock finished, success=", success)
 	if success:
 		game_state.t_pool[game_state.active_player_id] += amount
 		EventBus.t_pool_updated.emit(game_state.t_pool[0], game_state.t_pool[1])

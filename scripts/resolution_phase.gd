@@ -19,7 +19,7 @@ func start_chain_resolution() -> void:
 	if gear:
 		game_state.active_player_id = gear.owner_id
 		EventBus.player_changed.emit(game_state.active_player_id)
-	resolve_current_gear()
+	await resolve_current_gear()
 
 func resolve_current_gear() -> void:
 	_set_active_cell(game_state.current_resolve_pos)
@@ -30,7 +30,7 @@ func resolve_current_gear() -> void:
 	var gear = board_manager.get_gear_at(game_state.current_resolve_pos)
 	if not gear:
 		game_state.current_resolve_pos = get_next_cell()
-		resolve_current_gear()
+		await resolve_current_gear()
 		return
 	
 	GameLogger.info("Resolving gear at %s" % Game.pos_to_chess(game_state.current_resolve_pos))
@@ -40,7 +40,9 @@ func resolve_current_gear() -> void:
 	var skip = game_state.effect_system.has_modifier(gear, "no_auto_tick")
 	GameLogger.debug("Auto tick skip: %s, can_rotate: %s, ticks: %d/%d" % [skip, gear.can_rotate(), gear.current_ticks, gear.max_ticks])
 	if not skip and gear.can_rotate():
-		gear.do_tick(1)
+		print("ResolutionPhase: auto tick on ", gear.gear_name)
+		await gear.do_tick(1)
+		print("ResolutionPhase: auto tick finished on ", gear.gear_name)
 		game_manager.update_ui()
 	else:
 		GameLogger.debug("Auto tick prevented by Time Swarm or gear already face up")
@@ -83,7 +85,7 @@ func proceed_to_next_cell() -> void:
 		if gear:
 			game_state.active_player_id = gear.owner_id
 			EventBus.player_changed.emit(game_state.active_player_id)
-		resolve_current_gear()
+		await resolve_current_gear()
 
 func restart_chain_resolution() -> void:
 	GameLogger.info("Restarting chain resolution from last cell")
@@ -99,7 +101,7 @@ func restart_chain_resolution() -> void:
 	if gear:
 		game_state.active_player_id = gear.owner_id
 		EventBus.player_changed.emit(game_state.active_player_id)
-	resolve_current_gear()
+	await resolve_current_gear()
 
 func handle_gear_clicked(gear: Gear) -> void:
 	GameLogger.debug("ResolutionPhase handle_gear_clicked: " + gear.gear_name)
@@ -112,7 +114,7 @@ func handle_gear_clicked(gear: Gear) -> void:
 	
 	var cmd = ExtraTickCommand.new(gear, game_manager, game_state)
 	if cmd.can_execute():
-		cmd.execute()
+		await cmd.execute()
 	else:
 		if not gear.can_rotate():
 			GameLogger.warning("Cannot spend T on extra tick: gear is already face up or cannot rotate")
@@ -123,7 +125,7 @@ func handle_cell_clicked(cell: Cell) -> void:
 	if game_state.waiting_for_player and cell.board_pos == game_state.current_resolve_pos:
 		var gear = cell.occupied_gear
 		if gear:
-			handle_gear_clicked(gear)
+			await handle_gear_clicked(gear)
 			return
 	GameLogger.debug("ResolutionPhase: ignoring cell click at %s" % Game.pos_to_chess(cell.board_pos))
 

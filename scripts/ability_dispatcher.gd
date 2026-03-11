@@ -11,7 +11,7 @@ func _init(gm: GameManager, gs: GameState, eb):
 	game_manager = gm
 	game_state = gs
 	event_bus = eb
-	target_selector = TargetSelector.new(eb, gm, gs)  # добавлен gs
+	target_selector = TargetSelector.new(eb, gm, gs)
 	_connect_signals()
 
 func _connect_signals():
@@ -28,7 +28,6 @@ func _on_gear_triggered(gear: Gear):
 	_trigger_abilities_on_gear(gear, GameEnums.TriggerCondition.ON_TRIGGER, {"source_gear": gear})
 
 func _on_gear_resolved(gear: Gear, was_face_up: bool):
-	# Если шестерня уже была перевёрнута до разрешения, активируем её триггерные способности
 	if was_face_up:
 		_trigger_abilities_on_gear(gear, GameEnums.TriggerCondition.ON_TRIGGER, {"source_gear": gear})
 
@@ -88,7 +87,7 @@ func _handle_ability(ability: Ability, base_context: Dictionary):
 		if possible_targets.size() == 1 and ability.target_type != GameEnums.TargetType.ANY:
 			base_context["target"] = possible_targets[0]
 			ability.execute(base_context)
-			game_manager.update_ui()  # добавлено
+			game_manager.update_ui()
 			if target_selector.is_waiting:
 				target_selector.cancel_selection()
 			else:
@@ -97,4 +96,4 @@ func _handle_ability(ability: Ability, base_context: Dictionary):
 		target_selector.request_selection(ability, base_context.get("source_gear"), possible_targets, base_context)
 	else:
 		ability.execute(base_context)
-		game_manager.update_ui()  # добавлено (на всякий случай для способностей без цели)
+		game_manager.update_ui()

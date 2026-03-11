@@ -20,7 +20,9 @@ signal static_effect_unregistered(source: Node, effect: AbilityEffect)
 signal target_selection_requested(ability: Ability, source: Gear, possible_targets: Array, context: Dictionary)
 signal target_selected(target: Object)
 signal target_selection_cancelled()
-signal gear_resolved(gear: Gear)
+signal gear_resolved(gear: Gear, was_face_up: bool)
+# Новый сигнал для клика по иконке игрока
+signal player_clicked(player: Player)
 
 # Методы для эмиссии сигналов (если нужны)
 # В реальном классе они не нужны, так как сигналы можно вызывать напрямую

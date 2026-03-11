@@ -20,3 +20,5 @@ signal target_selection_requested(ability: Ability, source: Gear, possible_targe
 signal target_selected(target: Object)
 signal target_selection_cancelled()
 signal gear_resolved(gear: Gear, was_face_up: bool)
+# Новый сигнал для клика по иконке игрока
+signal player_clicked(player: Player)

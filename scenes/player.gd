@@ -64,6 +64,7 @@ func return_gear_to_hand(gear: Gear):
 	gear.current_ticks = 0
 	gear.is_triggered = false
 	gear.is_face_up = false
+	gear.damage_taken = 0
 	if gear.texture_reverse:
 		gear.sprite.texture = gear.texture_reverse
 	gear.update_rotation()

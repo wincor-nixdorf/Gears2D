@@ -28,6 +28,10 @@ func _ready():
 	initialize_game()
 	ui.action_pressed.connect(_on_action_button_pressed)
 	ui.hand_gear_selected.connect(_on_hand_gear_selected)
+	# Передаём ссылку на game_manager в UI
+	ui.set_game_manager(self)
+	# Подключаемся к сигналу клика по игроку
+	EventBus.player_clicked.connect(_on_player_clicked)
 	GameLogger.info("GameManager ready")
 
 func initialize_game():
@@ -114,6 +118,8 @@ func create_ability_by_id(id: int) -> Ability:
 			script_path = "res://resources/abilities/repeat_ability.gd"
 		GameEnums.AbilityID.MANA_LEAK:
 			script_path = "res://resources/abilities/mana_leak_ability.gd"
+		GameEnums.AbilityID.SPARK:
+			script_path = "res://resources/abilities/spark_ability.gd"
 		_:
 			return null
 	
@@ -383,6 +389,14 @@ func _on_cell_clicked(cell: Cell):
 		return
 	phase_machine.handle_cell_clicked(cell)
 
+func _on_player_clicked(player: Player):
+	print("=== GameManager._on_player_clicked: ", player.player_id)
+	if ui.is_target_selection_active():
+		if ui.is_valid_target(player):
+			EventBus.target_selected.emit(player)
+		return
+	phase_machine.handle_player_clicked(player)
+
 func _on_action_button_pressed():
 	phase_machine.handle_action_button()
 
@@ -407,6 +421,11 @@ func _check_state_based_actions():
 
 # -------------------- Интерфейс и подсветка --------------------
 func update_ui():
+	# Если активен выбор цели, не обновляем интерфейс,
+	# чтобы не сбросить промпт и подсветку целей
+	if ui.is_target_selection_active():
+		return
+	
 	ui.update_player(game_state.active_player_id)
 	ui.update_phase(game_state.current_phase)
 	ui.update_t_pool(game_state.t_pool[0], game_state.t_pool[1])
@@ -417,27 +436,31 @@ func update_ui():
 	ui.update_prompt(get_prompt_text())
 	ui.update_damage(players[0].damage, players[1].damage)
 	highlight_available_cells()
-	# Сбросить старую подсветку цепочки
 	board_manager.reset_chain_highlights()
 	highlight_chain_cells()
 
 func get_prompt_text() -> String:
+	# Если активен выбор цели, не меняем промпт (он уже установлен UI)
+	if ui.is_target_selection_active():
+		return ""
+	
+	var player_num = game_state.active_player_id + 1
 	match game_state.current_phase:
 		Game.GamePhase.CHAIN_BUILDING:
 			if game_state.last_cell_pos == Vector2i(-1, -1):
-				return "Select a starting cell and a gear from hand"
+				return "Player %d: Select a starting cell and a gear from hand" % player_num
 			elif not game_state.has_placed_this_turn:
 				if game_state.moves_in_round < 2:
-					return "You must make a move (continue the chain)"
+					return "Player %d: You must make a move (continue the chain)" % player_num
 				else:
-					return "You can make a move or press Pass"
+					return "Player %d: You can make a move or press Pass" % player_num
 			else:
-				return "You can take T from the last gear in the chain (click on it) or press End Turn"
+				return "Player %d: You can take T from the last gear in the chain (click on it) or press End Turn" % player_num
 		Game.GamePhase.UPTURN:
-			return "Click on an opponent's gear to peek for 1 T or press End Peek"
+			return "Player %d: Click on an opponent's gear to peek for 1 T or press End Peek" % player_num
 		Game.GamePhase.CHAIN_RESOLUTION:
 			if game_state.waiting_for_player:
-				return "Click on current gear for an extra tick for 1 T or press Skip"
+				return "Player %d: Click on current gear for an extra tick for 1 T or press Skip" % player_num
 			else:
 				return "Resolving chain..."
 		Game.GamePhase.RENEWAL:

@@ -31,6 +31,10 @@ func handle_cell_clicked(cell: Cell) -> void:
 func handle_gear_clicked(gear: Gear) -> void:
 	pass
 
+# Обработка клика по игроку
+func handle_player_clicked(player: Player) -> void:
+	pass
+
 # Обработка нажатия на кнопку действия
 func handle_action_button() -> void:
 	pass

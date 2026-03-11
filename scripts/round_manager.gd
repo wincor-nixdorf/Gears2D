@@ -35,10 +35,19 @@ func end_chain_resolution():
 	game_manager.set_active_cell(Vector2i(-1, -1))
 	phase_machine.change_phase(Game.GamePhase.RENEWAL)
 	GameLogger.info("Chain resolution phase ended. Starting renewal.")
+	
+	# Было (наносит урон оппоненту):
+	#for i in [0,1]:
+	#	var damage = game_state.t_pool[i]
+	#	game_manager.players[1-i].damage += damage
+	#	game_state.t_pool[i] = 0
+	
+	# Должно быть (наносит урон самому себе):
 	for i in [0,1]:
 		var damage = game_state.t_pool[i]
-		game_manager.players[1-i].damage += damage
-		game_state.t_pool[i] = 0
+		game_manager.players[i].damage += damage
+		game_state.t_pool[i] = 0	
+		
 	EventBus.t_pool_updated.emit(game_state.t_pool[0], game_state.t_pool[1])
 	
 	for p in game_manager.players:

@@ -21,12 +21,15 @@ var current_ticks: int = 0
 var is_triggered: bool = false
 var board_position: Vector2i = Vector2i(-1, -1)
 var abilities: Array[Ability] = []
+var damage_taken: int = 0
 
 var game_manager: GameManager
 
 @onready var sprite: Sprite2D = $Sprite
 @onready var click_area: Area2D = $ClickArea
 @onready var collision_shape: CollisionShape2D = $ClickArea/CollisionShape2D
+
+var _current_tween: Tween
 
 func set_game_manager(gm: GameManager):
 	game_manager = gm
@@ -48,6 +51,7 @@ func apply_data(data: GearData):
 	texture_reverse = data.texture_reverse
 	texture_obverse = data.texture_obverse
 	abilities = data.abilities.duplicate()
+	damage_taken = 0
 	if sprite:
 		if texture_reverse:
 			sprite.texture = texture_reverse
@@ -72,30 +76,46 @@ func set_cell_size(cell_size: float, indent: float = 0.9):
 func update_rotation():
 	if not sprite:
 		return
-	var angle_deg = current_ticks * 30.0
-	sprite.rotation_degrees = angle_deg
+	sprite.rotation_degrees = current_ticks * 30.0
+
+func _animate_rotation(target_ticks: int):
+	# Ждём завершения предыдущей анимации, если она ещё идёт
+	if _current_tween and _current_tween.is_valid():
+		await _current_tween.finished
+	var target_angle = target_ticks * 30.0
+	print("_animate_rotation start: from ", sprite.rotation_degrees, " to ", target_angle)
+	_current_tween = create_tween()
+	_current_tween.tween_property(sprite, "rotation_degrees", target_angle, 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_LINEAR)
+	await _current_tween.finished
+	print("_animate_rotation finished")
 
 func do_tick(ticks: int = 1) -> bool:
+	print("do_tick: ", gear_name, " old=", current_ticks, " new=", current_ticks+ticks)
 	if is_triggered:
 		return false
 	var old_ticks = current_ticks
 	current_ticks += ticks
 	if current_ticks >= max_ticks:
+		await _animate_rotation(max_ticks)
 		trigger()
+		rotated.emit(self, old_ticks, current_ticks)
 		return true
-	update_rotation()
+	await _animate_rotation(current_ticks)
 	rotated.emit(self, old_ticks, current_ticks)
 	return true
 
 func do_tock(ticks: int = 1) -> bool:
+	print("do_tock: ", gear_name, " old=", current_ticks, " new=", current_ticks-ticks)
 	if is_triggered:
 		return false
 	var old_ticks = current_ticks
 	current_ticks -= ticks
 	if current_ticks <= -max_tocks:
+		await _animate_rotation(-max_tocks)
 		destroy()
+		rotated.emit(self, old_ticks, current_ticks)
 		return true
-	update_rotation()
+	await _animate_rotation(current_ticks)
 	rotated.emit(self, old_ticks, current_ticks)
 	return true
 
@@ -109,7 +129,6 @@ func trigger():
 	else:
 		push_error("Gear: texture_obverse not assigned!")
 	sprite.rotation_degrees = 0
-	# Скрываем тултип, если он был показан
 	if game_manager:
 		game_manager.ui.hide_gear_tooltip()
 	triggered.emit(self)
@@ -119,6 +138,12 @@ func destroy():
 	destroyed.emit(self)
 	EventBus.gear_destroyed.emit(self)
 	queue_free()
+
+func take_damage(amount: int):
+	damage_taken += amount
+	var total_groove = max_ticks + max_tocks
+	if damage_taken >= total_groove:
+		destroy()
 
 func can_rotate() -> bool:
 	return not is_triggered
@@ -143,12 +168,16 @@ func get_abilities_description() -> String:
 func get_tooltip_text() -> String:
 	var owner_str = "Player 1" if owner_id == 0 else "Player 2"
 	var abilities_desc = get_abilities_description()
-	return "Gear: %s\nTocks: %d\nTicks: %d\nTime: %d\nOwner: %s\n\n%s" % [
+	var damage_info = ""
+	if is_face_up and damage_taken > 0:
+		damage_info = "\nDamage: %d/%d" % [damage_taken, max_ticks + max_tocks]
+	return "Gear: %s\nTocks: %d\nTicks: %d\nTime: %d\nOwner: %s%s\n\n%s" % [
 		gear_name,
 		max_tocks,
 		max_ticks,
 		current_ticks,
 		owner_str,
+		damage_info,
 		abilities_desc
 	]
 
@@ -164,7 +193,6 @@ func show_obverse_temporarily():
 		sprite.texture = original_texture
 		sprite.rotation_degrees = original_rotation
 
-# Подключение сигналов к GameManager
 func _connect_signals():
 	if not game_manager:
 		return

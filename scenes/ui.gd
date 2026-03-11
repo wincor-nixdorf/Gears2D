@@ -22,6 +22,10 @@ signal hand_gear_selected(gear: Node2D)
 @onready var damage0_label: Label = %DamagePlayer0Label
 @onready var damage1_label: Label = %DamagePlayer1Label
 
+# Кнопки-иконки игроков
+@onready var player0_button: Button = %Player0Button
+@onready var player1_button: Button = %Player1Button
+
 # Элементы панели логов
 @onready var log_panel: Panel = %LogPanel
 @onready var log_text: RichTextLabel = %LogText
@@ -36,7 +40,12 @@ signal hand_gear_selected(gear: Node2D)
 # Переменные для выбора цели
 var _target_selection_active: bool = false
 var _current_possible_targets: Array = []
-var _original_colors: Dictionary = {}  # для восстановления подсветки клеток/шестерён
+var _original_colors: Dictionary = {}  # для восстановления подсветки клеток/шестерён/игроков
+
+var game_manager: GameManager  # будет установлен из GameManager
+
+func set_game_manager(gm: GameManager):
+	game_manager = gm
 
 func _ready():
 	action_button.pressed.connect(_on_action_button_pressed)
@@ -52,6 +61,10 @@ func _ready():
 	# Подключаем сигналы для выбора цели
 	EventBus.target_selection_requested.connect(_on_target_selection_requested)
 	EventBus.target_selection_cancelled.connect(_on_target_selection_cancelled)
+	
+	# Подключаем кнопки игроков
+	player0_button.pressed.connect(_on_player_button_pressed.bind(0))
+	player1_button.pressed.connect(_on_player_button_pressed.bind(1))
 
 func _input(event):
 	if not _target_selection_active:
@@ -69,6 +82,20 @@ func _input(event):
 
 func _on_action_button_pressed():
 	action_pressed.emit()
+
+func _on_player_button_pressed(player_id: int):
+	if not game_manager:
+		return
+	var player = game_manager.get_players()[player_id]
+	if not player:
+		return
+	# Если активен выбор цели, отправляем сигнал с выбранным игроком
+	if _target_selection_active and player in _current_possible_targets:
+		EventBus.target_selected.emit(player)
+		_clear_target_selection()
+	else:
+		# Иначе просто эмитим общий сигнал (может быть обработан phase_machine)
+		EventBus.player_clicked.emit(player)
 
 func update_player(active_player_id: int):
 	player_label.text = "Active Player: " + str(active_player_id + 1)
@@ -281,8 +308,15 @@ func _on_target_selection_requested(ability: Ability, source: Gear, possible_tar
 	# Подсвечиваем возможные цели
 	_highlight_possible_targets(possible_targets)
 	
-	# Показываем сообщение игроку
-	prompt_label.text = "Select target for " + ability.ability_name
+	# Показываем сообщение игроку с указанием номера игрока, если известен
+	if game_manager:
+		var player_num = game_manager.game_state.active_player_id + 1
+		var prompt_text = "Player %d: Select target for %s" % [player_num, ability.ability_name]
+		prompt_label.text = prompt_text
+		print("   Setting prompt to: ", prompt_text)  # Отладка
+	else:
+		prompt_label.text = "Select target for " + ability.ability_name
+		print("   game_manager is null, prompt set to: ", prompt_label.text)
 
 func _on_target_selection_cancelled():
 	print("=== UI: _on_target_selection_cancelled")
@@ -315,8 +349,10 @@ func _highlight_possible_targets(targets: Array):
 			target.modulate = Color.GREEN
 			print("   New color: ", target.modulate)
 		elif target is Player:
-			# Можно подсветить что-то связанное с игроком, если есть
-			pass
+			var button = player0_button if target.player_id == 0 else player1_button
+			_original_colors[target] = button.modulate
+			button.modulate = Color.GREEN
+			print("   Highlighting player button for player ", target.player_id)
 	print("   _original_colors size: ", _original_colors.size())
 
 func _restore_highlights():
@@ -334,6 +370,10 @@ func _restore_highlights():
 			print("   Restoring gear: ", obj.gear_name, " to color: ", _original_colors[obj])
 			obj.modulate = _original_colors[obj]
 			print("   Actual color after restore: ", obj.modulate)
+		elif obj is Player:
+			var button = player0_button if obj.player_id == 0 else player1_button
+			button.modulate = _original_colors[obj]
+			print("   Restoring player button for player ", obj.player_id, " to color: ", _original_colors[obj])
 	_original_colors.clear()
 
 func _get_clicked_object():

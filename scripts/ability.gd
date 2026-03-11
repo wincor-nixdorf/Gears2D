@@ -20,7 +20,8 @@ func init(gm: GameManager, es: EffectSystem, eb: EventBus):
 	effect_system = es
 	event_bus = eb
 
-func execute(context: Dictionary):
+# Без ключевого слова async – оно не требуется
+func execute(context: Dictionary) -> void:
 	push_error("Ability.execute() not implemented for ", ability_name)
 
 # Возвращает список возможных целей для этой способности в данном контексте.

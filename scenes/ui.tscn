@@ -113,10 +113,16 @@ grow_vertical = 0
 custom_minimum_size = Vector2(100, 0)
 layout_mode = 2
 
+[node name="Player0Button" type="Button" parent="Control/InfoContainerPlayer1/VBoxContainerPlayer1"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Player1"
+
 [node name="DamagePlayer0Label" type="Label" parent="Control/InfoContainerPlayer1/VBoxContainerPlayer1"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 0
+text = "Damage0Label"
 
 [node name="T0Label" type="Label" parent="Control/InfoContainerPlayer1/VBoxContainerPlayer1"]
 unique_name_in_owner = true
@@ -137,10 +143,16 @@ offset_bottom = 50.0
 custom_minimum_size = Vector2(100, 0)
 layout_mode = 2
 
+[node name="Player1Button" type="Button" parent="Control/InfoContainerPlayer2/VBoxContainerPlayer2"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Player2"
+
 [node name="DamagePlayer1Label" type="Label" parent="Control/InfoContainerPlayer2/VBoxContainerPlayer2"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 0
+text = "Damage1Label"
 
 [node name="T1Label" type="Label" parent="Control/InfoContainerPlayer2/VBoxContainerPlayer2"]
 unique_name_in_owner = true

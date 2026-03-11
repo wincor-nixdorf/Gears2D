@@ -6,6 +6,7 @@ enum AbilityID {
 	TIME_SWARM,
 	REPEAT,
 	MANA_LEAK,
+	SPARK,
 }
 
 enum TriggerCondition {
