@@ -51,6 +51,11 @@ func return_gear_to_hand(gear: Gear):
 	var parent = gear.get_parent()
 	if parent is Cell:
 		parent.occupied_gear = null
+		# Удаляем вершину из графа цепочки, если она там есть
+		if game_manager:
+			game_manager.game_state.chain_graph.remove_vertex(parent.board_pos)
+			# Обновляем отображение графа (опционально)
+			EventBus.chain_built.emit(game_manager.game_state.chain_graph.to_dict())
 	if gear.get_parent():
 		gear.get_parent().remove_child(gear)
 	
@@ -65,6 +70,8 @@ func return_gear_to_hand(gear: Gear):
 	gear.is_triggered = false
 	gear.is_face_up = false
 	gear.damage_taken = 0
+	if gear.has_method("update_damage_label"):
+		gear.update_damage_label()
 	if gear.texture_reverse:
 		gear.sprite.texture = gear.texture_reverse
 	gear.update_rotation()

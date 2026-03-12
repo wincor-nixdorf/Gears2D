@@ -131,6 +131,10 @@ func handle_cell_clicked(cell: Cell) -> void:
 
 func handle_action_button() -> void:
 	if game_state.waiting_for_player:
+		# Проверяем, не активен ли выбор цели
+		if game_manager.ui.is_target_selection_active():
+			GameLogger.debug("Cannot skip while target selection is active")
+			return
 		var cmd = SkipCommand.new(game_manager, game_state)
 		if cmd.can_execute():
 			cmd.execute()

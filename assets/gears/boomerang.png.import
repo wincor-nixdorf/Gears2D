@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://8k8toblv7r2n"
-path="res://.godot/imported/spring.png-7a78a7f23cd81316230af5ffa5013ec7.ctex"
+uid="uid://b4poffdkjylox"
+path="res://.godot/imported/boomerang.png-1b25913153981986dd404d84fa59d1ea.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/gears/spring.png"
-dest_files=["res://.godot/imported/spring.png-7a78a7f23cd81316230af5ffa5013ec7.ctex"]
+source_file="res://assets/gears/boomerang.png"
+dest_files=["res://.godot/imported/boomerang.png-1b25913153981986dd404d84fa59d1ea.ctex"]
 
 [params]
 

@@ -167,25 +167,30 @@ layout_mode = 2
 [node name="TooltipPanel" type="Panel" parent="."]
 unique_name_in_owner = true
 z_index = 1
-custom_minimum_size = Vector2(400, 200)
+custom_minimum_size = Vector2(300, 400)
 offset_left = 1041.0
 offset_top = 147.0
 offset_right = 1152.0
 offset_bottom = 147.0
 
 [node name="VBoxContainer" type="VBoxContainer" parent="TooltipPanel"]
-layout_mode = 0
-offset_right = 40.0
-offset_bottom = 40.0
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 
 [node name="TooltipIcon" type="TextureRect" parent="TooltipPanel/VBoxContainer"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(64, 64)
 layout_mode = 2
-size_flags_horizontal = 0
+size_flags_horizontal = 4
 size_flags_vertical = 0
 
 [node name="TooltipLabel" type="Label" parent="TooltipPanel/VBoxContainer"]
 unique_name_in_owner = true
 layout_mode = 2
+size_flags_vertical = 1
 text = "TooltipLabel"
+autowrap_mode = 3

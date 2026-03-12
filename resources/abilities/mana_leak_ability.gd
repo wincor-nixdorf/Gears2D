@@ -6,23 +6,14 @@ func _init():
 	ability_name = "Mana Leak"
 	ability_type = GameEnums.AbilityType.TRIGGERED
 	trigger = GameEnums.TriggerCondition.ON_TRIGGER
-	description = "When triggered, prevent the next trigger of target enemy gear."
+	description = "When triggered, prevent the next trigger of an enemy gear."
 
 func execute(context: Dictionary):
 	var source = context.get("source_gear") as Gear
-	var target = context.get("target") as Gear
-	if not source or not target:
-		return
-	# Добавляем модификатор предотвращения срабатывания
-	effect_system.add_modifier(target, source, "prevent_trigger")
-	GameLogger.debug("Mana Leak applied to %s" % target.gear_name)
-
-func get_possible_targets(context: Dictionary) -> Array:
-	var source = context.get("source_gear") as Gear
 	if not source:
-		return []
-	var result = []
-	for gear in game_manager.get_board_manager().get_all_gears():
-		if gear.owner_id != source.owner_id:
-			result.append(gear)
-	return result
+		return
+	# Добавляем одно предотвращение для владельца source (т.е. для его противника)
+	# Счётчик хранится по owner_id владельца способности – при проверке мы будем смотреть enemy_id.
+	# Увеличиваем счётчик для source.owner_id – это означает, что следующий триггер врага (enemy_id = 1 - source.owner_id) будет предотвращён.
+	game_manager.game_state.prevented_triggers[source.owner_id] = game_manager.game_state.prevented_triggers.get(source.owner_id, 0) + 1
+	GameLogger.debug("Mana Leak activated, will prevent next enemy trigger")

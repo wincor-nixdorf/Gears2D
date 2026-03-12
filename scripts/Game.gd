@@ -4,7 +4,7 @@ extends Node
 const CELL_SIZE = 100
 const CELL_INDENT = 0.9
 const BOARD_SIZE = 8
-const MAX_DAMAGE = 50
+const MAX_DAMAGE = 24
 const START_HAND_SIZE = 6
 const DECK_SIZE = 32
 

@@ -111,7 +111,7 @@ func create_ability_by_id(id: int) -> Ability:
 	var script_path = ""
 	match id:
 		GameEnums.AbilityID.SPRING:
-			script_path = "res://resources/abilities/spring_ability.gd"
+			script_path = "res://resources/abilities/boomerang_ability.gd"
 		GameEnums.AbilityID.TIME_SWARM:
 			script_path = "res://resources/abilities/time_swarm_ability.gd"
 		GameEnums.AbilityID.REPEAT:
@@ -120,6 +120,8 @@ func create_ability_by_id(id: int) -> Ability:
 			script_path = "res://resources/abilities/mana_leak_ability.gd"
 		GameEnums.AbilityID.SPARK:
 			script_path = "res://resources/abilities/spark_ability.gd"
+		GameEnums.AbilityID.WRATH_OF_GOD:
+			script_path = "res://resources/abilities/wrath_of_god_ability.gd"
 		_:
 			return null
 	
@@ -148,6 +150,15 @@ func unregister_gear_effects(gear: Gear):
 func clear_used_abilities():
 	game_state.used_abilities_on_gear.clear()
 
+# Проверяет, предотвращён ли триггер для данной G, и уменьшает счётчик
+func is_trigger_prevented(gear: Gear) -> bool:
+	var enemy_id = 1 - gear.owner_id
+	if game_state.prevented_triggers.has(enemy_id) and game_state.prevented_triggers[enemy_id] > 0:
+		game_state.prevented_triggers[enemy_id] -= 1
+		GameLogger.debug("Trigger prevented for %s by Mana Leak" % gear.gear_name)
+		return true
+	return false
+	
 func is_ability_used_on_gear(gear: Gear, ability_id: int) -> bool:
 	var dict = game_state.used_abilities_on_gear.get(gear)
 	return dict != null and dict.has(ability_id)
@@ -369,8 +380,14 @@ func _on_gear_destroyed(gear: Gear):
 	
 	EventBus.gear_destroyed.emit(gear)
 	EventBus.chain_built.emit(game_state.chain_graph.to_dict())
-	update_ui()
-	_check_state_based_actions()
+	
+	# Проверяем, не была ли уничтожена последняя G в цепочке во время фазы построения
+	if game_state.current_phase == Game.GamePhase.CHAIN_BUILDING and cell and cell.board_pos == game_state.last_cell_pos:
+		GameLogger.debug("Last gear in chain destroyed. Ending chain building phase.")
+		end_chain_building()
+	else:
+		update_ui()
+		_check_state_based_actions()
 
 func _on_hand_gear_selected(gear: Gear):
 	if game_state.selected_gear:

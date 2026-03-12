@@ -1,8 +1,8 @@
 [
 	{
-		"name": "Spring",
+		"name": "Boomerang",
 		"texture_reverse": "res://assets/gears/reverse2.png",
-		"texture_obverse": "res://assets/gears/spring.png",
+		"texture_obverse": "res://assets/gears/boomerang.png",
 		"max_ticks": 2,
 		"max_tocks": 4,
 		"abilities": [0]
@@ -32,11 +32,19 @@
 		"abilities": [3]
 	},
 	{
-	"name": "Spark",
+		"name": "Spark",
+		"texture_reverse": "res://assets/gears/reverse2.png",
+		"texture_obverse": "res://assets/gears/spark.png",
+		"max_ticks": 1,
+		"max_tocks": 1,
+		"abilities": [4]
+	},
+	{
+	"name": "Wrath Of God",
 	"texture_reverse": "res://assets/gears/reverse2.png",
-	"texture_obverse": "res://assets/gears/spark.png",
-	"max_ticks": 1,
-	"max_tocks": 1,
-	"abilities": [4]
-}
+	"texture_obverse": "res://assets/gears/wrath.png",
+	"max_ticks": 6,
+	"max_tocks": 3,
+	"abilities": [5]
+	}
 ]

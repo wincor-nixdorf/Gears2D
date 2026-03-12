@@ -131,6 +131,11 @@ func trigger():
 	sprite.rotation_degrees = 0
 	if game_manager:
 		game_manager.ui.hide_gear_tooltip()
+	
+	# Проверка предотвращения триггера (Mana Leak)
+	if game_manager and game_manager.is_trigger_prevented(self):
+		return  # Не испускаем сигнал triggered
+	
 	triggered.emit(self)
 	EventBus.gear_triggered.emit(self)
 
@@ -168,18 +173,15 @@ func get_abilities_description() -> String:
 func get_tooltip_text() -> String:
 	var owner_str = "Player 1" if owner_id == 0 else "Player 2"
 	var abilities_desc = get_abilities_description()
-	var damage_info = ""
-	if is_face_up and damage_taken > 0:
-		damage_info = "\nDamage: %d/%d" % [damage_taken, max_ticks + max_tocks]
-	return "Gear: %s\nTocks: %d\nTicks: %d\nTime: %d\nOwner: %s%s\n\n%s" % [
-		gear_name,
-		max_tocks,
-		max_ticks,
-		current_ticks,
-		owner_str,
-		damage_info,
-		abilities_desc
+	var base = "Gear: %s\nTocks: %d\nTicks: %d\nTime: %d\nOwner: %s" % [
+		gear_name, max_tocks, max_ticks, current_ticks, owner_str
 	]
+	if damage_taken > 0:
+		# Просто добавляем текст без цветовых тегов
+		base += "\nDamage: %d/%d" % [damage_taken, max_ticks + max_tocks]
+	if abilities_desc:
+		base += "\n\n%s" % abilities_desc
+	return base
 
 func show_obverse_temporarily():
 	if not texture_obverse:

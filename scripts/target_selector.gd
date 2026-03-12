@@ -24,14 +24,30 @@ func request_selection(ability: Ability, source: Gear, targets: Array, context: 
 	possible_targets = targets
 	event_bus.target_selection_requested.emit(ability, source, targets, context)
 
-func select_target(target: Object):
+func select_target(target: Object) -> void:
 	if not is_waiting:
 		return
+	
+	# Сохраняем ссылки перед сбросом
+	var ability = current_ability
+	var context = current_context.duplicate()
+	var source = current_source
+	
 	is_waiting = false
-	current_context["target"] = target
+	current_ability = null
+	current_source = null
+	current_context = {}
+	possible_targets = []
 	
 	event_bus.target_selection_cancelled.emit()
-	current_ability.execute(current_context)
+	
+	if ability == null:
+		GameLogger.error("TargetSelector: current_ability is null in select_target")
+		return
+	
+	context["target"] = target
+	# Ждём завершения выполнения способности
+	await ability.execute(context)
 	game_manager.update_ui()
 	
 	# Автоматический переход к следующей G в цепочке, если текущая G стала face-up
@@ -39,11 +55,6 @@ func select_target(target: Object):
 		var current_gear = game_manager.board_manager.get_gear_at(game_state.current_resolve_pos)
 		if current_gear and current_gear.is_face_up:
 			game_manager.proceed_to_next_cell()
-	
-	current_ability = null
-	current_source = null
-	current_context = {}
-	possible_targets = []
 
 func cancel_selection():
 	if not is_waiting:

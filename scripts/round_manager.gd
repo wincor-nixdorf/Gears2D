@@ -36,19 +36,23 @@ func end_chain_resolution():
 	phase_machine.change_phase(Game.GamePhase.RENEWAL)
 	GameLogger.info("Chain resolution phase ended. Starting renewal.")
 	
-	# Было (наносит урон оппоненту):
-	#for i in [0,1]:
-	#	var damage = game_state.t_pool[i]
-	#	game_manager.players[1-i].damage += damage
-	#	game_state.t_pool[i] = 0
-	
-	# Должно быть (наносит урон самому себе):
+	# Наносим урон игрокам от их собственного пула T
 	for i in [0,1]:
 		var damage = game_state.t_pool[i]
 		game_manager.players[i].damage += damage
 		game_state.t_pool[i] = 0	
 		
 	EventBus.t_pool_updated.emit(game_state.t_pool[0], game_state.t_pool[1])
+	
+	# Сбрасываем предотвращения Mana Leak (действуют только в текущем раунде)
+	game_state.prevented_triggers.clear()
+	
+	# Сбрасываем повреждения на всех G на доске
+	for gear in game_manager.get_board_manager().get_all_gears():
+		gear.damage_taken = 0
+		# Обновляем отображение урона, если есть метка
+		if gear.has_method("update_damage_label"):
+			gear.update_damage_label()
 	
 	for p in game_manager.players:
 		if p.damage >= Game.MAX_DAMAGE:

@@ -27,7 +27,7 @@ func execute(context: Dictionary) -> void:
 			GameLogger.debug("Spark deals 1 damage to gear %s (total damage %d/%d)" % [target.gear_name, target.damage_taken, target.max_ticks + target.max_tocks])
 		else:
 			print("Spark: about to call do_tock on ", target.gear_name)
-			await target.do_tock(1)
+			await target.do_tock(1)   # уже есть await
 			print("Spark: do_tock finished on ", target.gear_name)
 			GameLogger.debug("Spark causes tock on gear %s" % target.gear_name)
 		game_manager.update_ui()

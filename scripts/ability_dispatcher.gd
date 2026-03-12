@@ -29,6 +29,9 @@ func _on_gear_triggered(gear: Gear):
 
 func _on_gear_resolved(gear: Gear, was_face_up: bool):
 	if was_face_up:
+		# Проверяем, не предотвращён ли триггер для этой G (Mana Leak)
+		if game_manager.is_trigger_prevented(gear):
+			return  # Триггер предотвращён, способности не активируются
 		_trigger_abilities_on_gear(gear, GameEnums.TriggerCondition.ON_TRIGGER, {"source_gear": gear})
 
 func _on_gear_placed(gear: Gear, cell: Cell):
@@ -57,7 +60,7 @@ func _on_phase_changed(old_phase: Game.GamePhase, new_phase: Game.GamePhase):
 func _on_target_selected(target: Object):
 	print("AbilityDispatcher._on_target_selected: ", target)
 	if target_selector.is_waiting:
-		target_selector.select_target(target)
+		await target_selector.select_target(target)   # добавлен await
 	else:
 		GameLogger.debug("Target selected but no waiting selector, ignoring")
 

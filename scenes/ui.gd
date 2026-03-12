@@ -197,9 +197,14 @@ func _on_hand_button_mouse_entered(gear: Gear):
 	else:
 		icon_texture = gear.texture_reverse
 	tooltip_icon.texture = _get_scaled_texture(icon_texture, 98)
-	tooltip_label.text = gear.get_tooltip_text()
-	tooltip_panel.global_position = _adjust_tooltip_position(get_viewport().get_mouse_position())
-	tooltip_panel.show()
+	
+	var tooltip_text = gear.get_tooltip_text()
+	print("Tooltip text: ", tooltip_text)  # отладка
+	print("tooltip_label: ", tooltip_label) # отладка
+	if tooltip_label:
+		tooltip_label.text = tooltip_text
+		tooltip_panel.global_position = _adjust_tooltip_position(get_viewport().get_mouse_position())
+		tooltip_panel.show()
 
 func show_gear_tooltip(gear: Gear, mouse_pos: Vector2):
 	var icon_texture = gear.sprite.texture

@@ -100,6 +100,9 @@ func handle_cell_clicked(cell: Cell) -> void:
 		GameLogger.warning("Cannot create double connection (2-cycle)")
 		return
 	
+	# Проверяем, образуется ли цикл (цель уже есть в графе до добавления ребра)
+	var forms_cycle = game_state.chain_graph.has_vertex(board_pos)
+	
 	# Добавляем ребро и начисляем T за использование существующей G
 	game_manager.add_edge(game_state.last_cell_pos, board_pos)
 	game_state.last_from_pos = game_state.last_cell_pos
@@ -109,7 +112,7 @@ func handle_cell_clicked(cell: Cell) -> void:
 	game_state.t_pool[active_player] += 1
 	EventBus.t_pool_updated.emit(game_state.t_pool[0], game_state.t_pool[1])
 	
-	if game_state.chain_graph.has_vertex(board_pos):
+	if forms_cycle:
 		GameLogger.info("Cycle formed at %s. Chain building phase ends." % Game.pos_to_chess(board_pos))
 		game_manager.on_successful_placement()
 		game_manager.end_chain_building()
@@ -143,7 +146,7 @@ func handle_gear_clicked(gear: Gear) -> void:
 		# Передаём все необходимые зависимости
 		var cmd = TakeTCommand.new(gear, 1, game_manager, game_state)
 		if cmd.can_execute():
-			cmd.execute()
+			await cmd.execute()
 			game_manager.update_ui()
 		else:
 			GameLogger.warning("Could not take T from gear")
