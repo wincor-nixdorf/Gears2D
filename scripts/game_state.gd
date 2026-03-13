@@ -25,7 +25,6 @@ var waiting_for_player: bool = false
 
 # -------------------- Способности и эффекты --------------------
 var used_abilities_on_gear: Dictionary = {}
-var prevented_triggers: Dictionary = {}
 
 # -------------------- Подсветка активной клетки --------------------
 var last_active_pos: Vector2i = Vector2i(-1, -1)

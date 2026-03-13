@@ -2,7 +2,7 @@
 class_name PassCommand
 extends GameCommand
 
-func _init(gm: GameManager, gs: GameState):
+func _init(gm: GameManager, gs: GameState) -> void:
 	super(gm, gs)
 
 func can_execute() -> bool:

@@ -4,7 +4,7 @@ extends GameCommand
 
 var gear: Gear
 
-func _init(p_gear: Gear, gm: GameManager, gs: GameState):
+func _init(p_gear: Gear, gm: GameManager, gs: GameState) -> void:
 	super(gm, gs)
 	gear = p_gear
 
@@ -21,5 +21,5 @@ func execute() -> void:
 	game_state.t_pool[game_state.active_player_id] -= 1
 	EventBus.t_pool_updated.emit(game_state.t_pool[0], game_state.t_pool[1])
 	gear.show_obverse_temporarily()
-	game_manager.update_ui()
+	# Удален game_manager.update_ui()
 	GameLogger.info("Spent T to peek. Remaining T%d: %d" % [game_state.active_player_id, game_state.t_pool[game_state.active_player_id]])

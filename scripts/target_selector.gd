@@ -16,7 +16,7 @@ func _init(eb, gm: GameManager, gs: GameState):
 	game_manager = gm
 	game_state = gs
 
-func request_selection(ability: Ability, source: Gear, targets: Array, context: Dictionary):
+func request_selection(ability: Ability, source: Gear, targets: Array, context: Dictionary) -> void:
 	is_waiting = true
 	current_ability = ability
 	current_source = source
@@ -39,24 +39,20 @@ func select_target(target: Object) -> void:
 	current_context = {}
 	possible_targets = []
 	
-	event_bus.target_selection_cancelled.emit()
+	event_bus.target_selection_cancelled.emit()  # убираем подсветку
 	
 	if ability == null:
 		GameLogger.error("TargetSelector: current_ability is null in select_target")
 		return
 	
 	context["target"] = target
-	# Ждём завершения выполнения способности
-	await ability.execute(context)
-	game_manager.update_ui()
+	# НЕ вызываем ability.execute здесь! Только возвращаем цель через сигнал.
+	# Диспетчер сам решит, что делать.
 	
-	# Автоматический переход к следующей G в цепочке, если текущая G стала face-up
-	if game_state.current_phase == Game.GamePhase.CHAIN_RESOLUTION:
-		var current_gear = game_manager.board_manager.get_gear_at(game_state.current_resolve_pos)
-		if current_gear and current_gear.is_face_up:
-			game_manager.proceed_to_next_cell()
+	# Возвращаем цель через сигнал
+	event_bus.target_selected.emit(target)
 
-func cancel_selection():
+func cancel_selection() -> void:
 	if not is_waiting:
 		return
 	is_waiting = false

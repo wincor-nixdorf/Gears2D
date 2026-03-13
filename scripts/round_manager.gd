@@ -8,14 +8,14 @@ var board_manager: BoardManager
 var phase_machine: PhaseMachine
 var ui: UI
 
-func _init(gm: GameManager, gs: GameState):
+func _init(gm: GameManager, gs: GameState) -> void:
 	game_manager = gm
 	game_state = gs
 	board_manager = gm.board_manager
 	phase_machine = gm.phase_machine
 	ui = gm.ui
 
-func start_round():
+func start_round() -> void:
 	game_manager.set_active_cell(Vector2i(-1, -1))
 	game_manager.clear_used_abilities()
 	game_state.start_player_id = game_state.active_player_id
@@ -29,9 +29,9 @@ func start_round():
 	game_state.selected_gear = null
 	ui.clear_selection()
 	phase_machine.change_phase(Game.GamePhase.CHAIN_BUILDING)
-	game_manager.update_ui()
+	# game_manager.update_ui() не нужен, phase_changed обновит
 
-func end_chain_resolution():
+func end_chain_resolution() -> void:
 	game_manager.set_active_cell(Vector2i(-1, -1))
 	phase_machine.change_phase(Game.GamePhase.RENEWAL)
 	GameLogger.info("Chain resolution phase ended. Starting renewal.")
@@ -44,13 +44,12 @@ func end_chain_resolution():
 		
 	EventBus.t_pool_updated.emit(game_state.t_pool[0], game_state.t_pool[1])
 	
-	# Сбрасываем предотвращения Mana Leak (действуют только в текущем раунде)
-	game_state.prevented_triggers.clear()
+	# Сбрасываем счётчики предотвращений (Mana Leak) на новый раунд
+	game_state.effect_system.clear_prevent_counts()
 	
 	# Сбрасываем повреждения на всех G на доске
 	for gear in game_manager.get_board_manager().get_all_gears():
 		gear.damage_taken = 0
-		# Обновляем отображение урона, если есть метка
 		if gear.has_method("update_damage_label"):
 			gear.update_damage_label()
 	
@@ -67,6 +66,6 @@ func end_chain_resolution():
 	EventBus.player_changed.emit(game_state.active_player_id)
 	start_round()
 
-func end_game(winner_id: int):
+func end_game(winner_id: int) -> void:
 	GameLogger.info("Player %d wins!" % (winner_id + 1))
 	game_manager.get_tree().paused = true

@@ -4,7 +4,12 @@ extends Phase
 
 func enter() -> void:
 	GameLogger.debug("ResolutionPhase: enter")
+	EventBus.stack_resolved.connect(_on_stack_resolved)
 	start_chain_resolution()
+
+func exit() -> void:
+	EventBus.stack_resolved.disconnect(_on_stack_resolved)
+	super()
 
 func start_chain_resolution() -> void:
 	GameLogger.debug("start_chain_resolution called, chain_graph size: " + str(game_state.chain_graph.size()))
@@ -36,21 +41,32 @@ func resolve_current_gear() -> void:
 	GameLogger.info("Resolving gear at %s" % Game.pos_to_chess(game_state.current_resolve_pos))
 	
 	var was_face_up = gear.is_face_up
-	
 	var skip = game_state.effect_system.has_modifier(gear, "no_auto_tick")
-	GameLogger.debug("Auto tick skip: %s, can_rotate: %s, ticks: %d/%d" % [skip, gear.can_rotate(), gear.current_ticks, gear.max_ticks])
 	if not skip and gear.can_rotate():
-		print("ResolutionPhase: auto tick on ", gear.gear_name)
 		await gear.do_tick(1)
-		print("ResolutionPhase: auto tick finished on ", gear.gear_name)
 		game_manager.update_ui()
-	else:
-		GameLogger.debug("Auto tick prevented by Time Swarm or gear already face up")
 	
 	EventBus.gear_resolved.emit(gear, was_face_up)
 	
+	# Запускаем разрешение стека (игрок должен нажать кнопку)
+	# Стек уже мог быть пуст, но мы просто ждём действий игрока
 	game_state.waiting_for_player = true
-	GameLogger.debug("Waiting for player action for gear at %s" % Game.pos_to_chess(game_state.current_resolve_pos))
+	game_manager.update_ui()
+
+func _on_stack_resolved() -> void:
+	if game_state.current_phase != Game.GamePhase.CHAIN_RESOLUTION:
+		return
+	if game_state.current_resolve_pos == Vector2i(-1, -1):
+		return
+	var gear = board_manager.get_gear_at(game_state.current_resolve_pos)
+	if not gear:
+		proceed_to_next_cell()
+		return
+	if gear.is_face_up:
+		proceed_to_next_cell()
+	else:
+		game_state.waiting_for_player = true
+		game_manager.update_ui()
 
 func get_next_cell() -> Vector2i:
 	var edges = game_state.chain_graph.get_edges_from(game_state.current_resolve_pos).duplicate()
@@ -131,7 +147,6 @@ func handle_cell_clicked(cell: Cell) -> void:
 
 func handle_action_button() -> void:
 	if game_state.waiting_for_player:
-		# Проверяем, не активен ли выбор цели
 		if game_manager.ui.is_target_selection_active():
 			GameLogger.debug("Cannot skip while target selection is active")
 			return

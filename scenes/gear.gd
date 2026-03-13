@@ -2,6 +2,7 @@
 class_name Gear
 extends Node2D
 
+# Сигналы
 signal rotated(gear: Gear, old_ticks: int, new_ticks: int)
 signal triggered(gear: Gear)
 signal destroyed(gear: Gear)
@@ -9,6 +10,7 @@ signal clicked(gear: Gear)
 signal mouse_entered(gear: Gear)
 signal mouse_exited(gear: Gear)
 
+# Параметры шестерни
 var gear_name: String = "Generic Gear"
 var owner_id: int = 0
 var max_ticks: int = 3
@@ -16,6 +18,7 @@ var max_tocks: int = 2
 var texture_reverse: Texture2D
 var texture_obverse: Texture2D
 
+# Состояние
 var is_face_up: bool = false
 var current_ticks: int = 0
 var is_triggered: bool = false
@@ -31,10 +34,10 @@ var game_manager: GameManager
 
 var _current_tween: Tween
 
-func set_game_manager(gm: GameManager):
+func set_game_manager(gm: GameManager) -> void:
 	game_manager = gm
 
-func _ready():
+func _ready() -> void:
 	if texture_reverse:
 		sprite.texture = texture_reverse
 	else:
@@ -44,7 +47,8 @@ func _ready():
 	click_area.mouse_entered.connect(_on_mouse_entered)
 	click_area.mouse_exited.connect(_on_mouse_exited)
 
-func apply_data(data: GearData):
+# Заполняет данные из GearData
+func apply_data(data: GearData) -> void:
 	gear_name = data.gear_name
 	max_ticks = data.max_ticks
 	max_tocks = data.max_tocks
@@ -57,7 +61,8 @@ func apply_data(data: GearData):
 			sprite.texture = texture_reverse
 		update_rotation()
 
-func set_cell_size(cell_size: float, indent: float = 0.9):
+# Устанавливает размер спрайта в соответствии с размером клетки
+func set_cell_size(cell_size: float, indent: float = 0.9) -> void:
 	var spr = $Sprite
 	if not spr:
 		return
@@ -73,39 +78,44 @@ func set_cell_size(cell_size: float, indent: float = 0.9):
 			collision_shape.shape = new_shape
 		collision_shape.shape.radius = target_size / 2.0
 
-func update_rotation():
+# Обновляет вращение спрайта в соответствии с current_ticks
+func update_rotation() -> void:
 	if not sprite:
 		return
 	sprite.rotation_degrees = current_ticks * 30.0
 
-func _animate_rotation(target_ticks: int):
-	# Ждём завершения предыдущей анимации, если она ещё идёт
+# Анимирует поворот к заданному количеству тиков
+func _animate_rotation(target_ticks: int) -> void:
 	if _current_tween and _current_tween.is_valid():
-		await _current_tween.finished
+		_current_tween.kill()
+	
 	var target_angle = target_ticks * 30.0
-	print("_animate_rotation start: from ", sprite.rotation_degrees, " to ", target_angle)
 	_current_tween = create_tween()
-	_current_tween.tween_property(sprite, "rotation_degrees", target_angle, 0.5).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_LINEAR)
+	_current_tween.tween_property(sprite, "rotation_degrees", target_angle, 0.5)\
+		.set_ease(Tween.EASE_IN_OUT)\
+		.set_trans(Tween.TRANS_LINEAR)
+	
 	await _current_tween.finished
-	print("_animate_rotation finished")
 
+# Выполняет поворот на указанное количество тиков вперёд
+# Возвращает true, если поворот выполнен, false если шестерня уже сработала
 func do_tick(ticks: int = 1) -> bool:
-	print("do_tick: ", gear_name, " old=", current_ticks, " new=", current_ticks+ticks)
 	if is_triggered:
 		return false
 	var old_ticks = current_ticks
 	current_ticks += ticks
 	if current_ticks >= max_ticks:
 		await _animate_rotation(max_ticks)
-		trigger()
+		trigger()  # trigger() добавит способности в стек
 		rotated.emit(self, old_ticks, current_ticks)
 		return true
 	await _animate_rotation(current_ticks)
 	rotated.emit(self, old_ticks, current_ticks)
 	return true
 
+# Выполняет поворот на указанное количество тиков назад (так)
+# Возвращает true, если поворот выполнен, false если шестерня уже сработала
 func do_tock(ticks: int = 1) -> bool:
-	print("do_tock: ", gear_name, " old=", current_ticks, " new=", current_ticks-ticks)
 	if is_triggered:
 		return false
 	var old_ticks = current_ticks
@@ -119,49 +129,62 @@ func do_tock(ticks: int = 1) -> bool:
 	rotated.emit(self, old_ticks, current_ticks)
 	return true
 
-func trigger():
+func trigger() -> void:
 	if is_triggered:
 		return
 	is_triggered = true
 	is_face_up = true
 	if texture_obverse:
 		sprite.texture = texture_obverse
-	else:
-		push_error("Gear: texture_obverse not assigned!")
 	sprite.rotation_degrees = 0
-	if game_manager:
-		game_manager.ui.hide_gear_tooltip()
 	
-	# Проверка предотвращения триггера (Mana Leak)
 	if game_manager and game_manager.is_trigger_prevented(self):
-		return  # Не испускаем сигнал triggered
+		return
 	
-	triggered.emit(self)
-	EventBus.gear_triggered.emit(self)
+	# Добавляем все способности G в стек (без целей)
+	for ability in abilities:
+		if ability.ability_type == GameEnums.AbilityType.TRIGGERED:
+			var context = {"source_gear": self}
+			GameLogger.debug("Gear %s: adding ability %s to stack" % [gear_name, ability.ability_name])
+			game_manager.stack_manager.push_effect(ability, self, null, context)
 
-func destroy():
+func flip() -> void:
+	if is_face_up:
+		return
+	is_face_up = true
+	if texture_obverse:
+		sprite.texture = texture_obverse
+	sprite.rotation_degrees = 0
+	trigger()  # при перевороте вызываем срабатывание
+	
+# Уничтожает шестерню
+func destroy() -> void:
 	destroyed.emit(self)
-	EventBus.gear_destroyed.emit(self)
 	queue_free()
 
-func take_damage(amount: int):
+# Наносит урон шестерне; если суммарный урон превышает max_ticks + max_tocks, уничтожает
+func take_damage(amount: int) -> void:
 	damage_taken += amount
 	var total_groove = max_ticks + max_tocks
 	if damage_taken >= total_groove:
 		destroy()
 
+# Проверяет, может ли шестерня вращаться (не сработала)
 func can_rotate() -> bool:
 	return not is_triggered
 
+# Проверяет, принадлежит ли шестерня указанному игроку
 func is_owned_by(player: int) -> bool:
 	return owner_id == player
 
+# Проверяет наличие способности с заданным ID
 func has_ability_id(aid: int) -> bool:
 	for a in abilities:
 		if a.ability_id == aid:
 			return true
 	return false
 
+# Возвращает строку с описанием способностей
 func get_abilities_description() -> String:
 	if abilities.is_empty():
 		return "No abilities"
@@ -170,6 +193,7 @@ func get_abilities_description() -> String:
 		desc += ability.description + "\n"
 	return desc.strip_edges()
 
+# Возвращает текст для подсказки
 func get_tooltip_text() -> String:
 	var owner_str = "Player 1" if owner_id == 0 else "Player 2"
 	var abilities_desc = get_abilities_description()
@@ -177,13 +201,13 @@ func get_tooltip_text() -> String:
 		gear_name, max_tocks, max_ticks, current_ticks, owner_str
 	]
 	if damage_taken > 0:
-		# Просто добавляем текст без цветовых тегов
 		base += "\nDamage: %d/%d" % [damage_taken, max_ticks + max_tocks]
 	if abilities_desc:
 		base += "\n\n%s" % abilities_desc
 	return base
 
-func show_obverse_temporarily():
+# Показывает аверс на короткое время (для фазы upturn)
+func show_obverse_temporarily() -> void:
 	if not texture_obverse:
 		return
 	var original_texture = sprite.texture
@@ -195,39 +219,18 @@ func show_obverse_temporarily():
 		sprite.texture = original_texture
 		sprite.rotation_degrees = original_rotation
 
-func _connect_signals():
-	if not game_manager:
-		return
-	rotated.connect(game_manager._on_gear_rotated)
-	triggered.connect(game_manager._on_gear_triggered)
-	destroyed.connect(game_manager._on_gear_destroyed)
-	clicked.connect(game_manager._on_gear_clicked)
-	mouse_entered.connect(game_manager._on_gear_mouse_entered)
-	mouse_exited.connect(game_manager._on_gear_mouse_exited)
-
-func _disconnect_signals():
-	if not game_manager:
-		return
-	rotated.disconnect(game_manager._on_gear_rotated)
-	triggered.disconnect(game_manager._on_gear_triggered)
-	destroyed.disconnect(game_manager._on_gear_destroyed)
-	clicked.disconnect(game_manager._on_gear_clicked)
-	mouse_entered.disconnect(game_manager._on_gear_mouse_entered)
-	mouse_exited.disconnect(game_manager._on_gear_mouse_exited)
-
-func _on_click_area_input(viewport: Node, event: InputEvent, shape_idx: int):
+func _on_click_area_input(viewport: Node, event: InputEvent, shape_idx: int) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
-		print("Gear click area input: ", gear_name, " at ", board_position)
 		clicked.emit(self)
 		viewport.set_input_as_handled()
 
-func _on_mouse_entered():
+func _on_mouse_entered() -> void:
 	if game_manager and game_manager.ui.is_target_selection_active():
 		return
 	modulate = Color(1, 1, 0.8)
 	mouse_entered.emit(self)
 
-func _on_mouse_exited():
+func _on_mouse_exited() -> void:
 	if game_manager and game_manager.ui.is_target_selection_active():
 		return
 	modulate = Color.WHITE

@@ -2,7 +2,7 @@
 class_name EndTurnCommand
 extends GameCommand
 
-func _init(gm: GameManager, gs: GameState):
+func _init(gm: GameManager, gs: GameState) -> void:
 	super(gm, gs)
 
 func can_execute() -> bool:
@@ -17,4 +17,4 @@ func execute() -> void:
 		game_manager.end_chain_building()
 	else:
 		GameLogger.info("Turn passed to player %d" % (game_state.active_player_id + 1))
-	game_manager.update_ui()
+	# Удален game_manager.update_ui()

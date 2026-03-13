@@ -4,7 +4,9 @@ extends CanvasLayer
 
 signal action_pressed
 signal hand_gear_selected(gear: Node2D)
+@onready var stack_panel = %StackPanel
 
+#@onready var stack_panel: Panel = $StackPanel
 @onready var player_label: Label = %PlayerLabel
 @onready var phase_label: Label = %PhaseLabel
 @onready var t0_label: Label = %T0Label
@@ -18,15 +20,12 @@ signal hand_gear_selected(gear: Node2D)
 @onready var chain_length_label: Label = %ChainLengthLabel
 @onready var prompt_label: Label = %PromptLabel
 
-# Метки для отображения урона
 @onready var damage0_label: Label = %DamagePlayer0Label
 @onready var damage1_label: Label = %DamagePlayer1Label
 
-# Кнопки-иконки игроков
 @onready var player0_button: Button = %Player0Button
 @onready var player1_button: Button = %Player1Button
 
-# Элементы панели логов
 @onready var log_panel: Panel = %LogPanel
 @onready var log_text: RichTextLabel = %LogText
 @onready var filter_debug: CheckBox = %FilterDebug
@@ -37,17 +36,13 @@ signal hand_gear_selected(gear: Node2D)
 
 @onready var tooltip_icon: TextureRect = %TooltipIcon
 
-# Переменные для выбора цели
+# Внутреннее состояние
 var _target_selection_active: bool = false
 var _current_possible_targets: Array = []
-var _original_colors: Dictionary = {}  # для восстановления подсветки клеток/шестерён/игроков
+var _original_colors: Dictionary = {}
+var _active_player_id: int = 0
 
-var game_manager: GameManager  # будет установлен из GameManager
-
-func set_game_manager(gm: GameManager):
-	game_manager = gm
-
-func _ready():
+func _ready() -> void:
 	action_button.pressed.connect(_on_action_button_pressed)
 	tooltip_panel.hide()
 	
@@ -58,15 +53,23 @@ func _ready():
 	filter_warning.button_pressed = true
 	filter_error.button_pressed = true
 	
-	# Подключаем сигналы для выбора цели
 	EventBus.target_selection_requested.connect(_on_target_selection_requested)
 	EventBus.target_selection_cancelled.connect(_on_target_selection_cancelled)
 	
-	# Подключаем кнопки игроков
 	player0_button.pressed.connect(_on_player_button_pressed.bind(0))
 	player1_button.pressed.connect(_on_player_button_pressed.bind(1))
+	
+	stack_panel.hide()
+	EventBus.stack_updated.connect(_on_stack_updated)
 
-func _input(event):
+func _on_stack_updated(snapshot: Array):
+	if snapshot.is_empty():
+		stack_panel.hide()
+	else:
+		stack_panel.show()
+		# Панель сама обновится через внутренний сигнал
+		
+func _input(event: InputEvent) -> void:
 	if not _target_selection_active:
 		return
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
@@ -80,35 +83,26 @@ func _input(event):
 			_clear_target_selection()
 			get_viewport().set_input_as_handled()
 
-func _on_action_button_pressed():
+func _on_action_button_pressed() -> void:
 	action_pressed.emit()
 
-func _on_player_button_pressed(player_id: int):
-	if not game_manager:
-		return
-	var player = game_manager.get_players()[player_id]
-	if not player:
-		return
-	# Если активен выбор цели, отправляем сигнал с выбранным игроком
-	if _target_selection_active and player in _current_possible_targets:
-		EventBus.target_selected.emit(player)
-		_clear_target_selection()
-	else:
-		# Иначе просто эмитим общий сигнал (может быть обработан phase_machine)
-		EventBus.player_clicked.emit(player)
+func _on_player_button_pressed(player_id: int) -> void:
+	EventBus.player_icon_clicked.emit(player_id)
 
-func update_player(active_player_id: int):
+# --- Методы обновления интерфейса (вызываются из GameUIManager) ---
+func update_player(active_player_id: int) -> void:
+	_active_player_id = active_player_id
 	player_label.text = "Active Player: " + str(active_player_id + 1)
 
-func update_phase(phase: Game.GamePhase):
+func update_phase(phase: Game.GamePhase) -> void:
 	var phase_names = ["Chain Building", "Upturn", "Resolution", "Renewal"]
 	phase_label.text = "Phase: " + phase_names[phase]
 
-func update_t_pool(t0: int, t1: int):
+func update_t_pool(t0: int, t1: int) -> void:
 	t0_label.text = "T: " + str(t0)
 	t1_label.text = "T: " + str(t1)
 
-func update_action_button(phase: Game.GamePhase, placed: bool, active_player_id: int, can_pass: bool):
+func update_action_button(phase: Game.GamePhase, placed: bool, active_player_id: int, can_pass: bool) -> void:
 	match phase:
 		Game.GamePhase.CHAIN_BUILDING:
 			if placed:
@@ -127,20 +121,20 @@ func update_action_button(phase: Game.GamePhase, placed: bool, active_player_id:
 			action_button.text = "Action"
 			action_button.disabled = false
 
-func update_round(round: int):
+func update_round(round: int) -> void:
 	round_label.text = "Round: " + str(round)
 
-func update_chain_length(length: int):
+func update_chain_length(length: int) -> void:
 	chain_length_label.text = "Chain: " + str(length) + " G"
 
-func update_prompt(text: String):
+func update_prompt(text: String) -> void:
 	prompt_label.text = text
 
-func update_damage(damage0: int, damage1: int):
+func update_damage(damage0: int, damage1: int) -> void:
 	damage0_label.text = str(damage0) + "/" + str(Game.MAX_DAMAGE)
 	damage1_label.text = str(damage1) + "/" + str(Game.MAX_DAMAGE)
 
-func update_hands(hand1: Array, hand2: Array, active_player_id: int):
+func update_hands(hand1: Array, hand2: Array, active_player_id: int) -> void:
 	for child in hand_container_player1.get_children():
 		child.queue_free()
 	for child in hand_container_player2.get_children():
@@ -149,6 +143,7 @@ func update_hands(hand1: Array, hand2: Array, active_player_id: int):
 	fill_hand_container(hand_container_player1, hand1, active_player_id == 0, 0)
 	fill_hand_container(hand_container_player2, hand2, active_player_id == 1, 1)
 
+# --- Вспомогательные методы для рук ---
 func _get_scaled_texture(texture: Texture2D, target_size: int) -> Texture2D:
 	if not texture:
 		return null
@@ -158,7 +153,7 @@ func _get_scaled_texture(texture: Texture2D, target_size: int) -> Texture2D:
 	image.resize(target_size, target_size, Image.INTERPOLATE_LANCZOS)
 	return ImageTexture.create_from_image(image)
 	
-func fill_hand_container(container: HBoxContainer, hand: Array, is_active: bool, player_id: int):
+func fill_hand_container(container: HBoxContainer, hand: Array, is_active: bool, player_id: int) -> void:
 	for gear in hand:
 		var button = Button.new()
 		var icon_texture = gear.texture_reverse
@@ -187,36 +182,34 @@ func fill_hand_container(container: HBoxContainer, hand: Array, is_active: bool,
 		button.custom_minimum_size = Vector2(220, 120)
 		container.add_child(button)
 
-func _on_hand_button_pressed(gear: Node2D):
+func _on_hand_button_pressed(gear: Node2D) -> void:
 	hand_gear_selected.emit(gear)
 
-func _on_hand_button_mouse_entered(gear: Gear):
+func _on_hand_button_mouse_entered(gear: Gear) -> void:
 	var icon_texture
-	if gear.owner_id == GameState.active_player_id:
+	if gear.owner_id == _active_player_id:
 		icon_texture = gear.texture_obverse
 	else:
 		icon_texture = gear.texture_reverse
 	tooltip_icon.texture = _get_scaled_texture(icon_texture, 98)
 	
 	var tooltip_text = gear.get_tooltip_text()
-	print("Tooltip text: ", tooltip_text)  # отладка
-	print("tooltip_label: ", tooltip_label) # отладка
 	if tooltip_label:
 		tooltip_label.text = tooltip_text
 		tooltip_panel.global_position = _adjust_tooltip_position(get_viewport().get_mouse_position())
 		tooltip_panel.show()
 
-func show_gear_tooltip(gear: Gear, mouse_pos: Vector2):
+func show_gear_tooltip(gear: Gear, mouse_pos: Vector2) -> void:
 	var icon_texture = gear.sprite.texture
 	tooltip_icon.texture = _get_scaled_texture(icon_texture, 98)
 	tooltip_label.text = gear.get_tooltip_text()
 	tooltip_panel.global_position = _adjust_tooltip_position(mouse_pos)
 	tooltip_panel.show()
 
-func _on_hand_button_mouse_exited():
+func _on_hand_button_mouse_exited() -> void:
 	tooltip_panel.hide()
 
-func highlight_gear(gear: Node2D):
+func highlight_gear(gear: Node2D) -> void:
 	for button in hand_container_player1.get_children():
 		if button.get_meta("gear") == gear:
 			button.modulate = Color.YELLOW
@@ -226,7 +219,7 @@ func highlight_gear(gear: Node2D):
 			button.modulate = Color.YELLOW
 			return
 
-func unhighlight_gear(gear: Node2D):
+func unhighlight_gear(gear: Node2D) -> void:
 	for button in hand_container_player1.get_children():
 		if button.get_meta("gear") == gear:
 			button.modulate = Color.WHITE if not button.disabled else Color(0.7, 0.7, 0.7)
@@ -236,7 +229,7 @@ func unhighlight_gear(gear: Node2D):
 			button.modulate = Color.WHITE if not button.disabled else Color(0.7, 0.7, 0.7)
 			return
 
-func clear_selection():
+func clear_selection() -> void:
 	for button in hand_container_player1.get_children():
 		if button.disabled:
 			button.modulate = Color(0.7, 0.7, 0.7)
@@ -248,7 +241,7 @@ func clear_selection():
 		else:
 			button.modulate = Color.WHITE
 
-func hide_gear_tooltip():
+func hide_gear_tooltip() -> void:
 	tooltip_panel.hide()
 
 func _adjust_tooltip_position(mouse_pos: Vector2) -> Vector2:
@@ -271,8 +264,8 @@ func _adjust_tooltip_position(mouse_pos: Vector2) -> Vector2:
 
 	return Vector2(x, y)
 
-# ----- Логирование на экран -----
-func _on_log_message(level: int, message: String, timestamp: Dictionary):
+# --- Логирование на экран ---
+func _on_log_message(level: int, message: String, timestamp: Dictionary) -> void:
 	var should_show = false
 	match level:
 		0: should_show = filter_debug.button_pressed
@@ -297,88 +290,70 @@ func _get_color_for_level(level: int) -> String:
 		4: return "#00FF00"
 		_: return "white"
 
-func _on_clear_log():
+func _on_clear_log() -> void:
 	log_text.text = ""
 
-# ----- Обработка выбора цели -----
-func _on_target_selection_requested(ability: Ability, source: Gear, possible_targets: Array, context: Dictionary):
+# --- Обработка выбора цели ---
+func _on_target_selection_requested(ability: Ability, source: Gear, possible_targets: Array, context: Dictionary) -> void:
 	if _target_selection_active:
-		print("=== UI: target selection already active, ignoring new request for ability ", ability.ability_name)
+		GameLogger.debug("UI: target selection already active, ignoring new request for ability %s" % ability.ability_name)
 		return
-	print("=== UI: _on_target_selection_requested for ability ", ability.ability_name)
-	print("   Possible targets: ", possible_targets)
+	GameLogger.debug("UI: target selection requested for ability %s" % ability.ability_name)
 	_target_selection_active = true
 	_current_possible_targets = possible_targets
 	
-	# Подсвечиваем возможные цели
 	_highlight_possible_targets(possible_targets)
 	
-	# Показываем сообщение игроку с указанием номера игрока, если известен
-	if game_manager:
-		var player_num = game_manager.game_state.active_player_id + 1
-		var prompt_text = "Player %d: Select target for %s" % [player_num, ability.ability_name]
-		prompt_label.text = prompt_text
-		print("   Setting prompt to: ", prompt_text)  # Отладка
-	else:
-		prompt_label.text = "Select target for " + ability.ability_name
-		print("   game_manager is null, prompt set to: ", prompt_label.text)
+	var player_num = source.owner_id + 1
+	var prompt_text = "Player %d: Select target for %s" % [player_num, ability.ability_name]
+	prompt_label.text = prompt_text
 
-func _on_target_selection_cancelled():
-	print("=== UI: _on_target_selection_cancelled")
+func _on_target_selection_cancelled() -> void:
+	GameLogger.debug("UI: target selection cancelled")
 	_clear_target_selection()
 
-func cancel_target_selection():
+func cancel_target_selection() -> void:
 	if _target_selection_active:
 		_clear_target_selection()
 		EventBus.target_selection_cancelled.emit()
 
-func _clear_target_selection():
-	print("=== UI: _clear_target_selection, target_selection_active was: ", _target_selection_active)
+func _clear_target_selection() -> void:
 	_target_selection_active = false
 	_current_possible_targets.clear()
 	_restore_highlights()
 	prompt_label.text = ""
 
-func _highlight_possible_targets(targets: Array):
-	print("=== UI: _highlight_possible_targets called with targets: ", targets)
+func _highlight_possible_targets(targets: Array) -> void:
 	_original_colors.clear()
 	for target in targets:
 		if target is Cell:
 			_original_colors[target] = target.sprite.modulate
-			print("   Saving color for cell at ", target.board_pos, ": ", target.sprite.modulate)
 			target.sprite.modulate = Color.GREEN
-			print("   New color: ", target.sprite.modulate)
+			GameLogger.debug("UI: highlighting cell at %s" % target.board_pos)
 		elif target is Gear:
 			_original_colors[target] = target.modulate
-			print("   Saving color for gear: ", target.gear_name, " at ", target.board_position, ": ", target.modulate)
 			target.modulate = Color.GREEN
-			print("   New color: ", target.modulate)
+			GameLogger.debug("UI: highlighting gear %s at %s" % [target.gear_name, target.board_position])
 		elif target is Player:
 			var button = player0_button if target.player_id == 0 else player1_button
 			_original_colors[target] = button.modulate
 			button.modulate = Color.GREEN
-			print("   Highlighting player button for player ", target.player_id)
-	print("   _original_colors size: ", _original_colors.size())
+			GameLogger.debug("UI: highlighting player %d button" % target.player_id)
 
-func _restore_highlights():
-	print("=== UI: _restore_highlights, _original_colors size: ", _original_colors.size())
+func _restore_highlights() -> void:
 	for obj in _original_colors:
-		var valid = is_instance_valid(obj)
-		print("   Object: ", obj, " valid: ", valid)
-		if not valid:
+		if not is_instance_valid(obj):
 			continue
 		if obj is Cell:
-			print("   Restoring cell at ", obj.board_pos, " to color: ", _original_colors[obj])
 			obj.sprite.modulate = _original_colors[obj]
-			print("   Actual color after restore: ", obj.sprite.modulate)
+			GameLogger.debug("UI: restoring cell at %s" % obj.board_pos)
 		elif obj is Gear:
-			print("   Restoring gear: ", obj.gear_name, " to color: ", _original_colors[obj])
 			obj.modulate = _original_colors[obj]
-			print("   Actual color after restore: ", obj.modulate)
+			GameLogger.debug("UI: restoring gear %s" % obj.gear_name)
 		elif obj is Player:
 			var button = player0_button if obj.player_id == 0 else player1_button
 			button.modulate = _original_colors[obj]
-			print("   Restoring player button for player ", obj.player_id, " to color: ", _original_colors[obj])
+			GameLogger.debug("UI: restoring player %d button" % obj.player_id)
 	_original_colors.clear()
 
 func _get_clicked_object():
@@ -396,9 +371,12 @@ func _get_clicked_object():
 	var result = space_state.intersect_point(params)
 	if result.size() > 0:
 		var collider = result[0].collider
-		if collider is Cell:
+		if collider is Gear:
 			return collider
-		elif collider is Gear:
+		elif collider is Cell:
+			# Если кликнули по клетке, проверяем, есть ли на ней G
+			if collider.occupied_gear:
+				return collider.occupied_gear
 			return collider
 		elif collider.get_parent() is Cell:
 			return collider.get_parent()

@@ -1,0 +1,33 @@
+[gd_scene load_steps=3 format=3 uid="uid://bpxlxdx2g8y70"]
+
+[ext_resource type="Script" uid="uid://d4f2rpp53sk5" path="res://scenes/stack_entry.gd" id="1_qv42g"]
+[ext_resource type="Texture2D" uid="uid://do8idrlksqeca" path="res://assets/abilities/default_ability.png" id="2_asfq1"]
+
+[node name="StackEntry" type="HBoxContainer"]
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 128.0
+grow_horizontal = 2
+script = ExtResource("1_qv42g")
+
+[node name="Icon" type="TextureRect" parent="."]
+unique_name_in_owner = true
+layout_mode = 2
+texture = ExtResource("2_asfq1")
+stretch_mode = 2
+
+[node name="Label" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 1
+text = "ability"
+
+[node name="UpButton" type="Button" parent="."]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Up"
+
+[node name="DownButton" type="Button" parent="."]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Down"

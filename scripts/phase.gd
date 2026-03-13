@@ -8,7 +8,7 @@ var board_manager: BoardManager
 var ui: UI
 var players: Array
 
-func _init(gm: GameManager, gs: GameState):
+func _init(gm: GameManager, gs: GameState) -> void:
 	game_manager = gm
 	game_state = gs
 	board_manager = gm.board_manager

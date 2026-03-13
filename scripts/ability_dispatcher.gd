@@ -15,25 +15,15 @@ func _init(gm: GameManager, gs: GameState, eb):
 	_connect_signals()
 
 func _connect_signals():
-	event_bus.gear_triggered.connect(_on_gear_triggered)
 	event_bus.gear_placed.connect(_on_gear_placed)
 	event_bus.gear_destroyed.connect(_on_gear_destroyed)
 	event_bus.gear_rotated.connect(_on_gear_rotated)
 	event_bus.phase_changed.connect(_on_phase_changed)
 	event_bus.target_selected.connect(_on_target_selected)
 	event_bus.target_selection_cancelled.connect(_on_target_selection_cancelled)
-	event_bus.gear_resolved.connect(_on_gear_resolved)
+	event_bus.gear_resolved.connect(_on_gear_resolved)  # восстановлено
 
-func _on_gear_triggered(gear: Gear):
-	_trigger_abilities_on_gear(gear, GameEnums.TriggerCondition.ON_TRIGGER, {"source_gear": gear})
-
-func _on_gear_resolved(gear: Gear, was_face_up: bool):
-	if was_face_up:
-		# Проверяем, не предотвращён ли триггер для этой G (Mana Leak)
-		if game_manager.is_trigger_prevented(gear):
-			return  # Триггер предотвращён, способности не активируются
-		_trigger_abilities_on_gear(gear, GameEnums.TriggerCondition.ON_TRIGGER, {"source_gear": gear})
-
+# --- Обработчики для статических и отложенных эффектов ---
 func _on_gear_placed(gear: Gear, cell: Cell):
 	_trigger_abilities_on_gear(gear, GameEnums.TriggerCondition.ON_PLACED, {"source_gear": gear, "cell": cell})
 	
@@ -57,12 +47,20 @@ func _on_phase_changed(old_phase: Game.GamePhase, new_phase: Game.GamePhase):
 		_trigger_abilities_global(GameEnums.TriggerCondition.ON_PHASE_START, context)
 		_trigger_abilities_global(GameEnums.TriggerCondition.ON_PHASE_END, {"phase": old_phase})
 
+func _on_gear_resolved(gear: Gear, was_face_up: bool):
+	# Если G уже была лицом вверх, её триггерные способности должны сработать
+	if was_face_up and not gear.is_triggered:
+		for ability in gear.abilities:
+			if ability.ability_type == GameEnums.AbilityType.TRIGGERED:
+				var context = {"source_gear": gear}
+				game_manager.stack_manager.push_effect(ability, gear, null, context)
+
+# --- Обработка выбора цели (для статических эффектов, не для стека) ---
 func _on_target_selected(target: Object):
-	print("AbilityDispatcher._on_target_selected: ", target)
 	if target_selector.is_waiting:
-		await target_selector.select_target(target)   # добавлен await
+		await target_selector.select_target(target)
 	else:
-		GameLogger.debug("Target selected but no waiting selector, ignoring")
+		GameLogger.debug("Target selected but no waiting selector")
 
 func _on_target_selection_cancelled():
 	if target_selector.is_waiting:
@@ -70,33 +68,29 @@ func _on_target_selection_cancelled():
 	else:
 		GameLogger.debug("Target selection cancelled but no waiting selector")
 
+# --- Методы для статических и отложенных эффектов (без стека) ---
 func _trigger_abilities_on_gear(gear: Gear, trigger: int, base_context: Dictionary):
 	for ability in gear.abilities:
 		if ability.trigger == trigger:
-			_handle_ability(ability, base_context)
+			_handle_ability_static(ability, base_context)
 
 func _trigger_abilities_global(trigger: int, base_context: Dictionary):
 	for gear in game_manager.get_board_manager().get_all_gears():
 		for ability in gear.abilities:
 			if ability.trigger == trigger:
-				_handle_ability(ability, base_context)
+				_handle_ability_static(ability, base_context)
 
-func _handle_ability(ability: Ability, base_context: Dictionary):
+func _handle_ability_static(ability: Ability, base_context: Dictionary):
+	# Статические и отложенные эффекты выполняются немедленно
 	if ability.target_type != GameEnums.TargetType.NO_TARGET:
 		var possible_targets = ability.get_possible_targets(base_context)
 		if possible_targets.is_empty():
-			GameLogger.debug("Ability %s has no valid targets, skipping" % ability.ability_name)
 			return
-		if possible_targets.size() == 1 and ability.target_type != GameEnums.TargetType.ANY:
+		if possible_targets.size() == 1:
 			base_context["target"] = possible_targets[0]
 			ability.execute(base_context)
-			game_manager.update_ui()
-			if target_selector.is_waiting:
-				target_selector.cancel_selection()
-			else:
-				event_bus.target_selection_cancelled.emit()
 			return
+		# Для способностей с выбором цели используем TargetSelector
 		target_selector.request_selection(ability, base_context.get("source_gear"), possible_targets, base_context)
 	else:
 		ability.execute(base_context)
-		game_manager.update_ui()

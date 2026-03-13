@@ -1,0 +1,103 @@
+# game_initializer.gd
+class_name GameInitializer
+extends RefCounted
+
+var game_manager: GameManager
+var board: Node2D
+var players_scene = preload("res://scenes/Player.tscn")
+var gear_scene = preload("res://scenes/Gear.tscn")
+
+func _init(gm: GameManager, board_node: Node2D):
+	game_manager = gm
+	board = board_node
+
+func initialize_game() -> void:
+	var deck_data = load_decks_from_json("res://data/gears.json")
+	var deck1: Array[GearData] = deck_data.duplicate()
+	var deck2: Array[GearData] = deck_data.duplicate()
+	deck1.shuffle()
+	deck2.shuffle()
+	
+	var player1 = players_scene.instantiate()
+	var player2 = players_scene.instantiate()
+	player1.player_id = 0
+	player1.owner_id = 0
+	player1.deck = deck1
+	player1.set_game_manager(game_manager)
+	player1.draw_starting_hand(Game.START_HAND_SIZE)
+	player2.player_id = 1
+	player2.owner_id = 1
+	player2.deck = deck2
+	player2.set_game_manager(game_manager)
+	player2.draw_starting_hand(Game.START_HAND_SIZE)
+	game_manager.add_child(player1)
+	game_manager.add_child(player2)
+	game_manager.players = [player1, player2]
+	
+	board.generate_board()
+	for row in board.cells:
+		for cell in row:
+			cell.clicked.connect(game_manager.event_handler._on_cell_clicked)
+	
+	GameLogger.info("Game initialized")
+
+func load_decks_from_json(path: String) -> Array[GearData]:
+	var file = FileAccess.open(path, FileAccess.READ)
+	if not file:
+		GameLogger.error("Cannot open JSON file: " + path)
+		return []
+	var text = file.get_as_text()
+	var json = JSON.new()
+	var error = json.parse(text)
+	if error != OK:
+		GameLogger.error("JSON parse error: " + json.get_error_message())
+		return []
+	var data = json.data
+	var result: Array[GearData] = []
+	for entry in data:
+		var gd = GearData.new()
+		gd.gear_name = entry.get("name", "Unknown")
+		var reverse_path = entry.get("texture_reverse", "")
+		var obverse_path = entry.get("texture_obverse", "")
+		if reverse_path:
+			gd.texture_reverse = load(reverse_path)
+		if obverse_path:
+			gd.texture_obverse = load(obverse_path)
+		gd.max_ticks = entry.get("max_ticks", 3)
+		gd.max_tocks = entry.get("max_tocks", 2)
+		var ability_ids = entry.get("abilities", [])
+		for aid in ability_ids:
+			var ability = create_ability_by_id(aid)
+			if ability:
+				gd.abilities.append(ability)
+		result.append(gd)
+	return result
+
+func create_ability_by_id(id: int) -> Ability:
+	var script_path = ""
+	match id:
+		GameEnums.AbilityID.SPRING:
+			script_path = "res://resources/abilities/boomerang_ability.gd"
+		GameEnums.AbilityID.TIME_SWARM:
+			script_path = "res://resources/abilities/time_swarm_ability.gd"
+		GameEnums.AbilityID.REPEAT:
+			script_path = "res://resources/abilities/repeat_ability.gd"
+		GameEnums.AbilityID.MANA_LEAK:
+			script_path = "res://resources/abilities/mana_leak_ability.gd"
+		GameEnums.AbilityID.SPARK:
+			script_path = "res://resources/abilities/spark_ability.gd"
+		GameEnums.AbilityID.WRATH_OF_GOD:
+			script_path = "res://resources/abilities/wrath_of_god_ability.gd"
+		GameEnums.AbilityID.UPHEAVAL:
+			script_path = "res://resources/abilities/upheaval_ability.gd"
+		_:
+			return null
+	
+	var script = load(script_path)
+	if script:
+		var ability = script.new() as Ability
+		ability.init(game_manager, game_manager.game_state.effect_system, EventBus, game_manager.stack_manager)
+		return ability
+	else:
+		GameLogger.error("Could not load ability script: " + script_path)
+		return null

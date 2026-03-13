@@ -4,7 +4,7 @@ extends GameCommand
 
 var gear: Gear
 
-func _init(p_gear: Gear, gm: GameManager, gs: GameState):
+func _init(p_gear: Gear, gm: GameManager, gs: GameState) -> void:
 	super(gm, gs)
 	gear = p_gear
 
@@ -22,11 +22,9 @@ func can_execute() -> bool:
 	return true
 
 func execute() -> void:
-	print("ExtraTickCommand: about to call do_tick on ", gear.gear_name)
 	var success = await gear.do_tick(1)
-	print("ExtraTickCommand: do_tick finished, success=", success)
 	if success:
 		game_state.t_pool[game_state.active_player_id] -= 1
 		EventBus.t_pool_updated.emit(game_state.t_pool[0], game_state.t_pool[1])
-		game_manager.update_ui()
 		GameLogger.info("Spent 1 T on extra tick")
+		# Автоматический запуск стека убран – теперь только по кнопке

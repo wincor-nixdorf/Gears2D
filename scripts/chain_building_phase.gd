@@ -143,7 +143,6 @@ func handle_gear_clicked(gear: Gear) -> void:
 			GameLogger.warning("You can only take T from the last gear placed in the chain")
 			return
 		
-		# Передаём все необходимые зависимости
 		var cmd = TakeTCommand.new(gear, 1, game_manager, game_state)
 		if cmd.can_execute():
 			await cmd.execute()

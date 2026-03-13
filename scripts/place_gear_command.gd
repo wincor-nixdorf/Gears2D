@@ -6,7 +6,7 @@ var cell: Cell
 var player: Player
 var gear: Gear
 
-func _init(p_cell: Cell, p_player: Player, p_gear: Gear, gm: GameManager, gs: GameState):
+func _init(p_cell: Cell, p_player: Player, p_gear: Gear, gm: GameManager, gs: GameState) -> void:
 	super(gm, gs)
 	cell = p_cell
 	player = p_player
@@ -27,7 +27,14 @@ func execute() -> void:
 	gear.set_cell_size(Game.CELL_SIZE, Game.CELL_INDENT)
 	gear.board_position = cell.board_pos
 	
-	gear._connect_signals()
+	# Подключаем сигналы к event_handler
+	if game_manager and game_manager.event_handler:
+		gear.rotated.connect(game_manager.event_handler._on_gear_rotated)
+		gear.triggered.connect(game_manager.event_handler._on_gear_triggered)
+		gear.destroyed.connect(game_manager.event_handler._on_gear_destroyed)
+		gear.clicked.connect(game_manager.event_handler._on_gear_clicked)
+		gear.mouse_entered.connect(game_manager.event_handler._on_gear_mouse_entered)
+		gear.mouse_exited.connect(game_manager.event_handler._on_gear_mouse_exited)
 	
 	EventBus.gear_placed.emit(gear, cell)
 	

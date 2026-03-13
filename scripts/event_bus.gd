@@ -20,5 +20,11 @@ signal target_selection_requested(ability: Ability, source: Gear, possible_targe
 signal target_selected(target: Object)
 signal target_selection_cancelled()
 signal gear_resolved(gear: Gear, was_face_up: bool)
-# Новый сигнал для клика по иконке игрока
-signal player_clicked(player: Player)
+signal player_icon_clicked(player_id: int)
+signal target_selection_started()
+
+# Сигналы для стека эффектов
+signal stack_updated(stack_snapshot: Array)           # массив словарей с данными о стеке
+signal stack_step_started(entry_data: Dictionary)     # данные текущего выполняемого элемента
+signal stack_step_finished(entry_data: Dictionary)    # данные завершённого элемента
+signal stack_resolved()                                # стек полностью разрешён

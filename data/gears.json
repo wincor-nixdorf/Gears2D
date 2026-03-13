@@ -40,11 +40,19 @@
 		"abilities": [4]
 	},
 	{
-	"name": "Wrath Of God",
-	"texture_reverse": "res://assets/gears/reverse2.png",
-	"texture_obverse": "res://assets/gears/wrath.png",
-	"max_ticks": 6,
-	"max_tocks": 3,
-	"abilities": [5]
+		"name": "Wrath Of God",
+		"texture_reverse": "res://assets/gears/reverse2.png",
+		"texture_obverse": "res://assets/gears/wrath.png",
+		"max_ticks": 6,
+		"max_tocks": 3,
+		"abilities": [5]
+	},
+	{
+		"name": "Upheaval",
+		"texture_reverse": "res://assets/gears/reverse2.png",
+		"texture_obverse": "res://assets/gears/upheaval.png",
+		"max_ticks": 6,
+		"max_tocks": 2,
+		"abilities": [6]
 	}
 ]

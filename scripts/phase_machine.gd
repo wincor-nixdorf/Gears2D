@@ -6,10 +6,11 @@ var current_phase: Phase
 var game_manager: GameManager
 var game_state: GameState
 
-func _init(gm: GameManager, gs: GameState):
+func _init(gm: GameManager, gs: GameState) -> void:
 	game_manager = gm
 	game_state = gs
 
+# Переключает фазу игры
 func change_phase(phase_type: Game.GamePhase) -> void:
 	if current_phase:
 		game_manager.ui.cancel_target_selection()

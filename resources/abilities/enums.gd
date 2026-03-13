@@ -8,6 +8,7 @@ enum AbilityID {
 	MANA_LEAK,
 	SPARK,
 	WRATH_OF_GOD,
+	UPHEAVAL,
 }
 
 enum TriggerCondition {
