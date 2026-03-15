@@ -17,6 +17,7 @@ var last_from_pos: Vector2i = Vector2i(-1, -1)
 var has_placed_this_turn: bool = false
 var moves_in_round: int = 0
 var selected_gear: Gear = null
+var selected_creature: Gear = null
 
 # -------------------- Разрешение цепочки --------------------
 var current_resolve_pos: Vector2i = Vector2i(-1, -1)

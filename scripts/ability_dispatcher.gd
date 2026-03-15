@@ -21,7 +21,7 @@ func _connect_signals():
 	event_bus.phase_changed.connect(_on_phase_changed)
 	event_bus.target_selected.connect(_on_target_selected)
 	event_bus.target_selection_cancelled.connect(_on_target_selection_cancelled)
-	event_bus.gear_resolved.connect(_on_gear_resolved)  # восстановлено
+	event_bus.gear_resolved.connect(_on_gear_resolved)
 
 # --- Обработчики для статических и отложенных эффектов ---
 func _on_gear_placed(gear: Gear, cell: Cell):
@@ -48,8 +48,10 @@ func _on_phase_changed(old_phase: Game.GamePhase, new_phase: Game.GamePhase):
 		_trigger_abilities_global(GameEnums.TriggerCondition.ON_PHASE_END, {"phase": old_phase})
 
 func _on_gear_resolved(gear: Gear, was_face_up: bool):
-	# Если G уже была лицом вверх, её триггерные способности должны сработать
-	if was_face_up and not gear.is_triggered:
+	if not is_instance_valid(gear) or not gear.is_on_board():
+		return
+	
+	if was_face_up:
 		for ability in gear.abilities:
 			if ability.ability_type == GameEnums.AbilityType.TRIGGERED:
 				var context = {"source_gear": gear}

@@ -49,7 +49,6 @@ func resolve_current_gear() -> void:
 	EventBus.gear_resolved.emit(gear, was_face_up)
 	
 	# Запускаем разрешение стека (игрок должен нажать кнопку)
-	# Стек уже мог быть пуст, но мы просто ждём действий игрока
 	game_state.waiting_for_player = true
 	game_manager.update_ui()
 
@@ -119,7 +118,11 @@ func restart_chain_resolution() -> void:
 		EventBus.player_changed.emit(game_state.active_player_id)
 	await resolve_current_gear()
 
-func handle_gear_clicked(gear: Gear) -> void:
+func handle_gear_clicked(gear: Gear, button_index: int) -> void:
+	# В фазе разрешения используется только левая кнопка для extra tick
+	if button_index != MOUSE_BUTTON_LEFT:
+		return
+	
 	GameLogger.debug("ResolutionPhase handle_gear_clicked: " + gear.gear_name)
 	if not game_state.waiting_for_player:
 		GameLogger.debug("Not waiting for player, ignoring")
@@ -141,7 +144,7 @@ func handle_cell_clicked(cell: Cell) -> void:
 	if game_state.waiting_for_player and cell.board_pos == game_state.current_resolve_pos:
 		var gear = cell.occupied_gear
 		if gear:
-			await handle_gear_clicked(gear)
+			await handle_gear_clicked(gear, MOUSE_BUTTON_LEFT)
 			return
 	GameLogger.debug("ResolutionPhase: ignoring cell click at %s" % Game.pos_to_chess(cell.board_pos))
 

@@ -185,19 +185,28 @@ func end_game(winner_id: int) -> void:
 	round_manager.end_game(winner_id)
 
 func _check_state_based_actions() -> void:
-	var actions_taken = false
-	for gear in board_manager.get_all_gears():
-		if gear.current_ticks <= -gear.max_tocks:
-			gear.destroy()
-			actions_taken = true
-			continue
-		if gear.current_ticks >= gear.max_ticks and not gear.is_triggered:
-			var prevented = game_state.effect_system.has_modifier(gear, "prevent_trigger")
-			if not prevented:
-				gear.trigger()
-			else:
-				game_state.effect_system.remove_modifier_by_tag(gear, "prevent_trigger")
-				GameLogger.debug("Trigger prevented by Mana Leak")
-			actions_taken = true
-	if actions_taken:
-		_check_state_based_actions()
+	var max_iterations = 100
+	var iterations = 0
+	while true:
+		iterations += 1
+		if iterations > max_iterations:
+			GameLogger.error("_check_state_based_actions: too many iterations, possible infinite loop")
+			break
+		
+		var actions_taken = false
+		for gear in board_manager.get_all_gears():
+			if gear.current_ticks <= -gear.max_tocks:
+				gear.destroy()
+				actions_taken = true
+				continue
+			if gear.current_ticks >= gear.max_ticks and not gear.is_triggered:
+				var prevented = game_state.effect_system.has_modifier(gear, "prevent_trigger")
+				if not prevented:
+					gear.trigger()
+				else:
+					game_state.effect_system.remove_modifier_by_tag(gear, "prevent_trigger")
+					GameLogger.debug("Trigger prevented by Mana Leak")
+				actions_taken = true
+		
+		if not actions_taken:
+			break

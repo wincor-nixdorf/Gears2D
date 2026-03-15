@@ -9,6 +9,8 @@ func _init(p_gear: Gear, gm: GameManager, gs: GameState) -> void:
 	gear = p_gear
 
 func can_execute() -> bool:
+	if not game_manager.stack_manager.is_stack_empty():
+		return false
 	if game_state.current_phase != Game.GamePhase.CHAIN_RESOLUTION:
 		return false
 	if not game_state.waiting_for_player:
@@ -27,4 +29,3 @@ func execute() -> void:
 		game_state.t_pool[game_state.active_player_id] -= 1
 		EventBus.t_pool_updated.emit(game_state.t_pool[0], game_state.t_pool[1])
 		GameLogger.info("Spent 1 T on extra tick")
-		# Автоматический запуск стека убран – теперь только по кнопке

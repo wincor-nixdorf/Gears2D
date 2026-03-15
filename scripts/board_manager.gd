@@ -34,6 +34,7 @@ func place_gear(gear: Gear, pos: Vector2i) -> bool:
 		return false
 	cell.set_occupied(gear)
 	gear.board_position = pos
+	gear.zone = Gear.Zone.BOARD   # устанавливаем зону
 	return true
 
 # Убирает шестерню с клетки (не уничтожая)

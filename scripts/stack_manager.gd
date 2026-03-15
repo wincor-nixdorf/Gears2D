@@ -102,6 +102,9 @@ func resolve_next() -> void:
 			GameLogger.debug("Ability %s has no valid targets, skipping" % entry.ability.ability_name)
 			_event_bus.stack_step_finished.emit(entry_data)
 			_event_bus.stack_updated.emit(_get_stack_snapshot())
+			# Проверяем, не стал ли стек пуст после пропуска
+			if _stacks[0].is_empty() and _stacks[1].is_empty() and _pending_target_entry == null:
+				_event_bus.stack_resolved.emit()
 			return
 		
 		_pending_target_entry = entry
@@ -113,6 +116,9 @@ func resolve_next() -> void:
 	await _execute_entry(entry)
 	_event_bus.stack_step_finished.emit(entry_data)
 	_event_bus.stack_updated.emit(_get_stack_snapshot())
+	# После выполнения проверяем, не стал ли стек пуст
+	if _stacks[0].is_empty() and _stacks[1].is_empty() and _pending_target_entry == null:
+		_event_bus.stack_resolved.emit()
 
 func _execute_entry(entry: StackEntry) -> void:
 	var context = entry.context.duplicate()
@@ -136,7 +142,9 @@ func _on_target_selected(target: Object) -> void:
 	
 	_event_bus.stack_step_finished.emit(entry.to_dict())
 	_event_bus.stack_updated.emit(_get_stack_snapshot())
-	# Не продолжаем автоматически
+	# После выполнения проверяем, не стал ли стек пуст
+	if _stacks[0].is_empty() and _stacks[1].is_empty() and _pending_target_entry == null:
+		_event_bus.stack_resolved.emit()
 
 func _on_target_selection_cancelled() -> void:
 	if _pending_target_entry == null:
@@ -152,6 +160,9 @@ func clear_stack() -> void:
 	_stacks[1].clear()
 	_pending_target_entry = null
 	_event_bus.stack_updated.emit(_get_stack_snapshot())
+
+func is_stack_empty() -> bool:
+	return _stacks[0].is_empty() and _stacks[1].is_empty() and _pending_target_entry == null
 
 # --- Методы для восстановления из словарей ---
 func _find_ability_by_id(id: int) -> Ability:

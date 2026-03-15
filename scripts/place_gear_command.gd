@@ -13,6 +13,8 @@ func _init(p_cell: Cell, p_player: Player, p_gear: Gear, gm: GameManager, gs: Ga
 	gear = p_gear
 
 func can_execute() -> bool:
+	if not game_manager.stack_manager.is_stack_empty():
+		return false
 	if not cell or not player or not gear:
 		return false
 	if not gear.is_owned_by(player.owner_id) or not (gear in player.hand):
@@ -26,11 +28,10 @@ func execute() -> void:
 	cell.set_occupied(gear)
 	gear.set_cell_size(Game.CELL_SIZE, Game.CELL_INDENT)
 	gear.board_position = cell.board_pos
+	gear.zone = Gear.Zone.BOARD   # устанавливаем зону
 	
-	# Подключаем сигналы к event_handler
 	if game_manager and game_manager.event_handler:
 		gear.rotated.connect(game_manager.event_handler._on_gear_rotated)
-		gear.triggered.connect(game_manager.event_handler._on_gear_triggered)
 		gear.destroyed.connect(game_manager.event_handler._on_gear_destroyed)
 		gear.clicked.connect(game_manager.event_handler._on_gear_clicked)
 		gear.mouse_entered.connect(game_manager.event_handler._on_gear_mouse_entered)

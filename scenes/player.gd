@@ -31,9 +31,10 @@ func draw_card() -> Gear:
 	gear.apply_data(gear_data)
 	gear.owner_id = owner_id
 	gear.set_game_manager(game_manager)
+	gear.zone = Gear.Zone.HAND
 	hand.append(gear)
 	add_child(gear)
-	EventBus.hand_updated.emit(player_id, hand)  # добавлено
+	EventBus.hand_updated.emit(player_id, hand)
 	return gear
 
 # Формирует стартовую руку заданного размера
@@ -46,7 +47,7 @@ func remove_from_hand(gear: Gear) -> bool:
 	if gear in hand:
 		hand.erase(gear)
 		remove_child(gear)
-		EventBus.hand_updated.emit(player_id, hand)  # добавлено
+		EventBus.hand_updated.emit(player_id, hand)
 		return true
 	return false
 
@@ -67,12 +68,10 @@ func return_gear_to_hand(gear: Gear) -> void:
 	if game_manager:
 		game_manager.unregister_gear_effects(gear)
 	
-	# Отключаем сигналы от event_handler
+	# Отключаем сигналы от event_handler (кроме triggered – он не подключается)
 	if game_manager and game_manager.event_handler:
 		if gear.rotated.is_connected(game_manager.event_handler._on_gear_rotated):
 			gear.rotated.disconnect(game_manager.event_handler._on_gear_rotated)
-		if gear.triggered.is_connected(game_manager.event_handler._on_gear_triggered):
-			gear.triggered.disconnect(game_manager.event_handler._on_gear_triggered)
 		if gear.destroyed.is_connected(game_manager.event_handler._on_gear_destroyed):
 			gear.destroyed.disconnect(game_manager.event_handler._on_gear_destroyed)
 		if gear.clicked.is_connected(game_manager.event_handler._on_gear_clicked):
@@ -86,6 +85,7 @@ func return_gear_to_hand(gear: Gear) -> void:
 	gear.is_triggered = false
 	gear.is_face_up = false
 	gear.damage_taken = 0
+	gear.zone = Gear.Zone.HAND
 	if gear.has_method("update_damage_label"):
 		gear.update_damage_label()
 	if gear.texture_reverse:
@@ -94,4 +94,4 @@ func return_gear_to_hand(gear: Gear) -> void:
 	
 	hand.append(gear)
 	add_child(gear)
-	EventBus.hand_updated.emit(player_id, hand)  # добавлено
+	EventBus.hand_updated.emit(player_id, hand)

@@ -27,8 +27,8 @@ func exit() -> void:
 func handle_cell_clicked(cell: Cell) -> void:
 	pass
 
-# Обработка клика по шестерне
-func handle_gear_clicked(gear: Gear) -> void:
+# Обработка клика по шестерне (с учётом кнопки мыши)
+func handle_gear_clicked(gear: Gear, button_index: int) -> void:
 	pass
 
 # Обработка клика по игроку

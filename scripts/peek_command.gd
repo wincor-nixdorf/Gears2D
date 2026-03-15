@@ -9,6 +9,8 @@ func _init(p_gear: Gear, gm: GameManager, gs: GameState) -> void:
 	gear = p_gear
 
 func can_execute() -> bool:
+	if not game_manager.stack_manager.is_stack_empty():
+		return false
 	if game_state.current_phase != Game.GamePhase.UPTURN:
 		return false
 	if gear.is_owned_by(game_state.active_player_id) or gear.is_face_up:
@@ -21,5 +23,4 @@ func execute() -> void:
 	game_state.t_pool[game_state.active_player_id] -= 1
 	EventBus.t_pool_updated.emit(game_state.t_pool[0], game_state.t_pool[1])
 	gear.show_obverse_temporarily()
-	# Удален game_manager.update_ui()
 	GameLogger.info("Spent T to peek. Remaining T%d: %d" % [game_state.active_player_id, game_state.t_pool[game_state.active_player_id]])

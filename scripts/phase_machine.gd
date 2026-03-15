@@ -37,9 +37,9 @@ func handle_cell_clicked(cell: Cell) -> void:
 	if current_phase:
 		current_phase.handle_cell_clicked(cell)
 
-func handle_gear_clicked(gear: Gear) -> void:
+func handle_gear_clicked(gear: Gear, button_index: int) -> void:
 	if current_phase:
-		current_phase.handle_gear_clicked(gear)
+		current_phase.handle_gear_clicked(gear, button_index)
 
 func handle_player_clicked(player: Player) -> void:
 	if current_phase:

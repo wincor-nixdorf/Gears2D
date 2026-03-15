@@ -30,19 +30,15 @@ func _subscribe_to_events() -> void:
 	EventBus.chain_built.connect(_request_update)
 	EventBus.gear_resolved.connect(_request_update)
 
-# Запрашивает обновление, но не выполняет сразу
 func _request_update(_arg1 = null, _arg2 = null, _arg3 = null, _arg4 = null) -> void:
 	if _update_pending:
 		return
 	_update_pending = true
-	# Выполняем обновление в конце текущего кадра
 	call_deferred("_do_update")
 
-# Фактическое обновление UI
 func _do_update() -> void:
 	_update_pending = false
 	
-	# Защита от вызова до инициализации игроков
 	if game_manager.players.is_empty():
 		return
 	if ui.is_target_selection_active():
@@ -50,11 +46,24 @@ func _do_update() -> void:
 	
 	var start_time = Time.get_ticks_msec()
 	
+	var stack_empty = game_manager.stack_manager.is_stack_empty()
+	
 	ui.update_player(game_state.active_player_id)
 	ui.update_phase(game_state.current_phase)
 	ui.update_t_pool(game_state.t_pool[0], game_state.t_pool[1])
-	ui.update_action_button(game_state.current_phase, game_state.has_placed_this_turn, game_state.active_player_id, rule_validator.can_pass())
-	ui.update_hands(game_manager.players[0].hand, game_manager.players[1].hand, game_state.active_player_id)
+	ui.update_action_button(
+		game_state.current_phase,
+		game_state.has_placed_this_turn,
+		game_state.active_player_id,
+		rule_validator.can_pass(),
+		stack_empty
+	)
+	ui.update_hands(
+		game_manager.players[0].hand,
+		game_manager.players[1].hand,
+		game_state.active_player_id,
+		stack_empty
+	)
 	ui.update_round(game_state.round_number)
 	ui.update_chain_length(game_state.chain_graph.size())
 	ui.update_prompt(get_prompt_text())
@@ -64,7 +73,7 @@ func _do_update() -> void:
 	highlight_chain_cells()
 	
 	var elapsed = Time.get_ticks_msec() - start_time
-	if elapsed > 30:  # логируем только если заметная задержка
+	if elapsed > 30:
 		GameLogger.debug("update_ui took %d ms" % elapsed)
 
 func get_prompt_text() -> String:

@@ -35,3 +35,24 @@ enum TargetType {
 	PLAYER,
 	ANY,
 }
+
+enum GearSupertype {
+	NONE,
+	LEGENDARY
+}
+
+enum GearType {
+	ROUTINE,
+	CREATURE,
+	TUNING
+}
+
+enum GearSubtype {
+	NONE,
+	GEARLING,
+	GOLEM,
+	GREMLIN,
+	GOBLIN,
+	GIANT,
+	GANGSTER
+}

@@ -7,7 +7,7 @@ func _init() -> void:
 	ability_type = GameEnums.AbilityType.TRIGGERED
 	trigger = GameEnums.TriggerCondition.ON_TRIGGER
 	target_type = GameEnums.TargetType.ANY
-	description = "Deal 1 damage to any target: player, face-down gear (tock), or face-up gear (damage)."
+	description = "Deal 1 damage to any target: player, face-down gear (tock), or creature (damage)."
 
 func execute(context: Dictionary) -> void:
 	var source = context.get("source_gear") as Gear
@@ -18,17 +18,18 @@ func execute(context: Dictionary) -> void:
 	if target is Player:
 		target.damage += 1
 		GameLogger.info("Spark deals 1 damage to Player %d" % (target.player_id + 1))
-		# Удален game_manager.update_ui()
 		return
 	
 	if target is Gear:
 		if target.is_face_up:
+			# Если это существо (type == CREATURE) или любая другая G лицом вверх, наносим урон
+			# По логике игры урон могут получать только существа, но для простоты пока оставим так,
+			# однако в get_possible_targets мы уже отфильтровали только существ для is_face_up.
 			target.take_damage(1)
 			GameLogger.debug("Spark deals 1 damage to gear %s (total damage %d/%d)" % [target.gear_name, target.damage_taken, target.max_ticks + target.max_tocks])
 		else:
 			await target.do_tock(1)
 			GameLogger.debug("Spark causes tock on gear %s" % target.gear_name)
-		# Удален game_manager.update_ui()
 
 func get_possible_targets(context: Dictionary) -> Array:
 	var source = context.get("source_gear") as Gear
@@ -36,6 +37,20 @@ func get_possible_targets(context: Dictionary) -> Array:
 		return []
 	
 	var result = []
+	
+	# Добавляем обоих игроков (можно наносить урон любому игроку, включая себя?)
 	result.append_array(game_manager.get_players())
-	result.append_array(game_manager.get_board_manager().get_all_gears())
+	
+	# Добавляем все шестерни на доске
+	for gear in game_manager.get_board_manager().get_all_gears():
+		# Если шестерня лицом вниз — разрешена
+		if not gear.is_face_up:
+			result.append(gear)
+			continue
+		# Если шестерня лицом вверх и является существом (type == CREATURE) — разрешена
+		if gear.is_face_up and gear.type == GameEnums.GearType.CREATURE:
+			result.append(gear)
+			# Если есть другие типы, которые могут получать урон (например, TUNING), можно добавить позже
+		# Иначе лицом вверх и не существо — не добавляем
+	
 	return result

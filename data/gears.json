@@ -1,6 +1,10 @@
 [
 	{
 		"name": "Boomerang",
+		"supertype": "",
+		"type": "Routine",
+		"subtype": "",
+		"speed": 0,
 		"texture_reverse": "res://assets/gears/reverse2.png",
 		"texture_obverse": "res://assets/gears/boomerang.png",
 		"max_ticks": 2,
@@ -9,6 +13,10 @@
 	},
 	{
 		"name": "Time Swarm",
+		"supertype": "",
+		"type": "Routine",
+		"subtype": "",
+		"speed": 0,
 		"texture_reverse": "res://assets/gears/reverse2.png",
 		"texture_obverse": "res://assets/gears/time_swarm.png",
 		"max_ticks": 4,
@@ -17,6 +25,10 @@
 	},
 	{
 		"name": "Repeat",
+		"supertype": "",
+		"type": "Routine",
+		"subtype": "",
+		"speed": 0,
 		"texture_reverse": "res://assets/gears/reverse2.png",
 		"texture_obverse": "res://assets/gears/repeat.png",
 		"max_ticks": 3,
@@ -25,6 +37,10 @@
 	},
 	{
 		"name": "Mana Leak",
+		"supertype": "",
+		"type": "Routine",
+		"subtype": "",
+		"speed": 0,
 		"texture_reverse": "res://assets/gears/reverse2.png",
 		"texture_obverse": "res://assets/gears/mana_leak.png",
 		"max_ticks": 2,
@@ -33,6 +49,10 @@
 	},
 	{
 		"name": "Spark",
+		"supertype": "",
+		"type": "Routine",
+		"subtype": "",
+		"speed": 0,
 		"texture_reverse": "res://assets/gears/reverse2.png",
 		"texture_obverse": "res://assets/gears/spark.png",
 		"max_ticks": 1,
@@ -41,6 +61,10 @@
 	},
 	{
 		"name": "Wrath Of God",
+		"supertype": "",
+		"type": "Routine",
+		"subtype": "",
+		"speed": 0,
 		"texture_reverse": "res://assets/gears/reverse2.png",
 		"texture_obverse": "res://assets/gears/wrath.png",
 		"max_ticks": 6,
@@ -49,10 +73,39 @@
 	},
 	{
 		"name": "Upheaval",
+		"supertype": "",
+		"type": "Routine",
+		"subtype": "",
+		"speed": 0,
 		"texture_reverse": "res://assets/gears/reverse2.png",
 		"texture_obverse": "res://assets/gears/upheaval.png",
 		"max_ticks": 6,
 		"max_tocks": 2,
 		"abilities": [6]
-	}
+	},
+	{
+		"name": "Sparkling",
+		"supertype": "",
+		"type": "Creature",
+		"subtype": "Gearling",
+		"speed": 3,
+		"texture_reverse": "res://assets/gears/reverse2.png",
+		"texture_obverse": "res://assets/gears/sparkling.png",
+		"max_ticks": 2,
+		"max_tocks": 1,
+		"abilities": [4]
+	},
+	{
+		"name": "Air Gangsters",
+		"supertype": "Legendary",
+		"type": "Creature",
+		"subtype": "Gangster",
+		"speed": 4,
+		"is_flying": true,
+		"texture_reverse": "res://assets/gears/reverse2.png",
+		"texture_obverse": "res://assets/gears/air_gangsters.png",
+		"max_ticks": 3,
+		"max_tocks": 3,
+		"abilities": []
+}
 ]

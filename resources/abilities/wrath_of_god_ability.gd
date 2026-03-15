@@ -25,4 +25,7 @@ func execute(context: Dictionary):
 		if gear:
 			gear.destroy()
 	
+	# Очищаем граф, чтобы избежать зацикливания при разрешении
+	chain_graph.clear()
+	
 	GameLogger.info("Wrath Of God destroyed all gears in the current chain")

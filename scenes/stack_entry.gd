@@ -23,7 +23,8 @@ func setup(entry_data: Dictionary, stack_manager: StackManager):
 		var owner_text = "P1" if entry_data.source_owner_id == 0 else "P2"
 		var pos = Vector2i(entry_data.source_pos_x, entry_data.source_pos_y)
 		var pos_text = Game.pos_to_chess(pos)
-		label.text = "%s from %s at %s (%s)" % [entry_data.ability_name, entry_data.source_gear_name, pos_text, owner_text]
+		# Изменено: название способности в скобках
+		label.text = "(%s) from %s at %s (%s)" % [entry_data.ability_name, entry_data.source_gear_name, pos_text, owner_text]
 	else:
 		push_error("Label node not found")
 	

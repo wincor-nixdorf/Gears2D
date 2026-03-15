@@ -4,9 +4,8 @@ extends CanvasLayer
 
 signal action_pressed
 signal hand_gear_selected(gear: Node2D)
-@onready var stack_panel = %StackPanel
 
-#@onready var stack_panel: Panel = $StackPanel
+@onready var stack_panel = %StackPanel
 @onready var player_label: Label = %PlayerLabel
 @onready var phase_label: Label = %PhaseLabel
 @onready var t0_label: Label = %T0Label
@@ -19,13 +18,10 @@ signal hand_gear_selected(gear: Node2D)
 @onready var round_label: Label = %RoundLabel
 @onready var chain_length_label: Label = %ChainLengthLabel
 @onready var prompt_label: Label = %PromptLabel
-
 @onready var damage0_label: Label = %DamagePlayer0Label
 @onready var damage1_label: Label = %DamagePlayer1Label
-
 @onready var player0_button: Button = %Player0Button
 @onready var player1_button: Button = %Player1Button
-
 @onready var log_panel: Panel = %LogPanel
 @onready var log_text: RichTextLabel = %LogText
 @onready var filter_debug: CheckBox = %FilterDebug
@@ -33,10 +29,8 @@ signal hand_gear_selected(gear: Node2D)
 @onready var filter_warning: CheckBox = %FilterWarning
 @onready var filter_error: CheckBox = %FilterError
 @onready var clear_log_button: Button = %ClearLogButton
-
 @onready var tooltip_icon: TextureRect = %TooltipIcon
 
-# Внутреннее состояние
 var _target_selection_active: bool = false
 var _current_possible_targets: Array = []
 var _original_colors: Dictionary = {}
@@ -67,8 +61,7 @@ func _on_stack_updated(snapshot: Array):
 		stack_panel.hide()
 	else:
 		stack_panel.show()
-		# Панель сама обновится через внутренний сигнал
-		
+
 func _input(event: InputEvent) -> void:
 	if not _target_selection_active:
 		return
@@ -89,7 +82,6 @@ func _on_action_button_pressed() -> void:
 func _on_player_button_pressed(player_id: int) -> void:
 	EventBus.player_icon_clicked.emit(player_id)
 
-# --- Методы обновления интерфейса (вызываются из GameUIManager) ---
 func update_player(active_player_id: int) -> void:
 	_active_player_id = active_player_id
 	player_label.text = "Active Player: " + str(active_player_id + 1)
@@ -102,7 +94,12 @@ func update_t_pool(t0: int, t1: int) -> void:
 	t0_label.text = "T: " + str(t0)
 	t1_label.text = "T: " + str(t1)
 
-func update_action_button(phase: Game.GamePhase, placed: bool, active_player_id: int, can_pass: bool) -> void:
+func update_action_button(phase: Game.GamePhase, placed: bool, active_player_id: int, can_pass: bool, stack_empty: bool) -> void:
+	if not stack_empty:
+		action_button.disabled = true
+		action_button.text = "Stack active"
+		return
+	
 	match phase:
 		Game.GamePhase.CHAIN_BUILDING:
 			if placed:
@@ -134,16 +131,15 @@ func update_damage(damage0: int, damage1: int) -> void:
 	damage0_label.text = str(damage0) + "/" + str(Game.MAX_DAMAGE)
 	damage1_label.text = str(damage1) + "/" + str(Game.MAX_DAMAGE)
 
-func update_hands(hand1: Array, hand2: Array, active_player_id: int) -> void:
+func update_hands(hand1: Array, hand2: Array, active_player_id: int, stack_empty: bool) -> void:
 	for child in hand_container_player1.get_children():
 		child.queue_free()
 	for child in hand_container_player2.get_children():
 		child.queue_free()
 	
-	fill_hand_container(hand_container_player1, hand1, active_player_id == 0, 0)
-	fill_hand_container(hand_container_player2, hand2, active_player_id == 1, 1)
+	fill_hand_container(hand_container_player1, hand1, active_player_id == 0, 0, stack_empty)
+	fill_hand_container(hand_container_player2, hand2, active_player_id == 1, 1, stack_empty)
 
-# --- Вспомогательные методы для рук ---
 func _get_scaled_texture(texture: Texture2D, target_size: int) -> Texture2D:
 	if not texture:
 		return null
@@ -152,8 +148,8 @@ func _get_scaled_texture(texture: Texture2D, target_size: int) -> Texture2D:
 		return texture
 	image.resize(target_size, target_size, Image.INTERPOLATE_LANCZOS)
 	return ImageTexture.create_from_image(image)
-	
-func fill_hand_container(container: HBoxContainer, hand: Array, is_active: bool, player_id: int) -> void:
+
+func fill_hand_container(container: HBoxContainer, hand: Array, is_active: bool, player_id: int, stack_empty: bool) -> void:
 	for gear in hand:
 		var button = Button.new()
 		var icon_texture = gear.texture_reverse
@@ -165,15 +161,33 @@ func fill_hand_container(container: HBoxContainer, hand: Array, is_active: bool,
 			button.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
 			button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		
+		# Сбор информации для текста
+		var type_line = gear.get_type_line()
 		var abilities_text = gear.get_abilities_description()
-		var text = gear.gear_name + "\n" + "Tocks: " + str(gear.max_tocks) + " Ticks: " + str(gear.max_ticks) + "\n" + abilities_text
+		var speed_text = ""
+		if gear.type == GameEnums.GearType.CREATURE and gear.speed > 0:
+			speed_text = "\nSpeed: %d" % gear.speed
+		
+		var text = "%s\n%s\nTocks: %d Ticks: %d Time: %d%s\n%s" % [
+			gear.gear_name,
+			type_line,
+			gear.max_tocks,
+			gear.max_ticks,
+			gear.current_ticks,
+			speed_text,
+			abilities_text
+		]
 		button.text = text
 		button.set_meta("gear", gear)
 		
 		if is_active:
-			button.pressed.connect(_on_hand_button_pressed.bind(gear))
-			button.mouse_entered.connect(_on_hand_button_mouse_entered.bind(gear))
-			button.mouse_exited.connect(_on_hand_button_mouse_exited)
+			if stack_empty:
+				button.pressed.connect(_on_hand_button_pressed.bind(gear))
+				button.mouse_entered.connect(_on_hand_button_mouse_entered.bind(gear))
+				button.mouse_exited.connect(_on_hand_button_mouse_exited)
+			else:
+				button.disabled = true
+				button.modulate = Color(0.7, 0.7, 0.7)
 		else:
 			button.disabled = true
 			button.modulate = Color(0.7, 0.7, 0.7)
@@ -264,7 +278,6 @@ func _adjust_tooltip_position(mouse_pos: Vector2) -> Vector2:
 
 	return Vector2(x, y)
 
-# --- Логирование на экран ---
 func _on_log_message(level: int, message: String, timestamp: Dictionary) -> void:
 	var should_show = false
 	match level:
@@ -293,7 +306,6 @@ func _get_color_for_level(level: int) -> String:
 func _on_clear_log() -> void:
 	log_text.text = ""
 
-# --- Обработка выбора цели ---
 func _on_target_selection_requested(ability: Ability, source: Gear, possible_targets: Array, context: Dictionary) -> void:
 	if _target_selection_active:
 		GameLogger.debug("UI: target selection already active, ignoring new request for ability %s" % ability.ability_name)
@@ -374,7 +386,6 @@ func _get_clicked_object():
 		if collider is Gear:
 			return collider
 		elif collider is Cell:
-			# Если кликнули по клетке, проверяем, есть ли на ней G
 			if collider.occupied_gear:
 				return collider.occupied_gear
 			return collider

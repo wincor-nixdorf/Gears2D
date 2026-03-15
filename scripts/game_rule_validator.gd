@@ -97,3 +97,53 @@ func get_available_cells() -> Array[Cell]:
 
 func get_start_positions_for_player(player: int) -> Array[Vector2i]:
 	return board_manager.get_start_positions_for_player(player)
+
+# --- Методы для перемещения существ ---
+
+# Проверяет, свободен ли путь по диагонали/прямой для перемещения как король
+# Все промежуточные клетки должны быть пустыми и того же цвета, что и стартовая
+func is_path_clear_for_king(start: Vector2i, target: Vector2i, player_color_is_white: bool) -> bool:
+	var dx = sign(target.x - start.x)
+	var dy = sign(target.y - start.y)
+	var steps = max(abs(target.x - start.x), abs(target.y - start.y))
+	var current = start + Vector2i(dx, dy)
+	for i in range(steps - 1):
+		var cell = board_manager.get_cell(current)
+		if not cell or not cell.is_empty():
+			return false
+		if cell.is_white() != player_color_is_white:
+			return false
+		current += Vector2i(dx, dy)
+	return true
+
+# Возвращает все пустые клетки своего цвета, достижимые существом за его speed,
+# с учётом flying (для нелетающих проверяем путь)
+func get_reachable_cells_for_creature(creature: Gear, from_pos: Vector2i, last_cell_pos: Vector2i) -> Array[Cell]:
+	var result: Array[Cell] = []
+	var speed = creature.speed
+	var from_cell = board_manager.get_cell(from_pos)
+	if not from_cell:
+		return result
+	var player_color_is_white = (creature.owner_id == 0)  # цвет игрока, которому принадлежит существо
+	var is_white = from_cell.is_white()
+	
+	for x in range(Game.BOARD_SIZE):
+		for y in range(Game.BOARD_SIZE):
+			var pos = Vector2i(x, y)
+			if pos == from_pos:
+				continue
+			var cell = board_manager.get_cell(pos)
+			if not cell or not cell.is_empty():
+				continue
+			if cell.is_white() != is_white:
+				continue
+			var dx = abs(pos.x - from_pos.x)
+			var dy = abs(pos.y - from_pos.y)
+			var distance = max(dx, dy)
+			if distance > speed:
+				continue
+			if not creature.is_flying:
+				if not is_path_clear_for_king(from_pos, pos, player_color_is_white):
+					continue
+			result.append(cell)
+	return result

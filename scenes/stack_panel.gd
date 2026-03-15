@@ -3,7 +3,6 @@ extends Panel
 
 @onready var container: VBoxContainer = $VBoxContainer
 @onready var resolve_button: Button = %ResolveButton
-@onready var cancel_button: Button = %CancelButton
 
 var _stack_manager: StackManager
 var _entry_scene = preload("res://scenes/stack_entry.tscn")
@@ -14,10 +13,6 @@ func _ready():
 		print("Resolve button connected")
 	else:
 		push_error("resolve_button not found")
-	if cancel_button:
-		cancel_button.pressed.connect(_on_cancel_pressed)
-	else:
-		push_error("cancel_button not found")
 	
 	EventBus.target_selection_started.connect(_on_target_selection_started)
 	EventBus.target_selection_cancelled.connect(_on_target_selection_ended)

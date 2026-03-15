@@ -6,6 +6,8 @@ func _init(gm: GameManager, gs: GameState) -> void:
 	super(gm, gs)
 
 func can_execute() -> bool:
+	if not game_manager.stack_manager.is_stack_empty():
+		return false
 	if game_manager.ui.is_target_selection_active():
 		return false
 	return game_state.current_phase == Game.GamePhase.CHAIN_RESOLUTION and game_state.waiting_for_player

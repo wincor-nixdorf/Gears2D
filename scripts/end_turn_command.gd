@@ -6,6 +6,8 @@ func _init(gm: GameManager, gs: GameState) -> void:
 	super(gm, gs)
 
 func can_execute() -> bool:
+	if not game_manager.stack_manager.is_stack_empty():
+		return false
 	return game_state.current_phase == Game.GamePhase.CHAIN_BUILDING and game_state.has_placed_this_turn
 
 func execute() -> void:
@@ -17,4 +19,3 @@ func execute() -> void:
 		game_manager.end_chain_building()
 	else:
 		GameLogger.info("Turn passed to player %d" % (game_state.active_player_id + 1))
-	# Удален game_manager.update_ui()

@@ -57,6 +57,46 @@ func load_decks_from_json(path: String) -> Array[GearData]:
 	for entry in data:
 		var gd = GearData.new()
 		gd.gear_name = entry.get("name", "Unknown")
+		
+		# supertype
+		var super_str = entry.get("supertype", "")
+		match super_str:
+			"Legendary":
+				gd.supertype = GameEnums.GearSupertype.LEGENDARY
+			_:
+				gd.supertype = GameEnums.GearSupertype.NONE
+		
+		# type
+		var type_str = entry.get("type", "Routine")
+		match type_str:
+			"Creature":
+				gd.type = GameEnums.GearType.CREATURE
+			"Tuning":
+				gd.type = GameEnums.GearType.TUNING
+			_:
+				gd.type = GameEnums.GearType.ROUTINE
+		
+		# subtype
+		var sub_str = entry.get("subtype", "")
+		match sub_str:
+			"Gearling":
+				gd.subtype = GameEnums.GearSubtype.GEARLING
+			"Golem":
+				gd.subtype = GameEnums.GearSubtype.GOLEM
+			"Gremlin":
+				gd.subtype = GameEnums.GearSubtype.GREMLIN
+			"Goblin":
+				gd.subtype = GameEnums.GearSubtype.GOBLIN
+			"Giant":
+				gd.subtype = GameEnums.GearSubtype.GIANT
+			"Pirate":
+				gd.subtype = GameEnums.GearSubtype.GANGSTER
+			_:
+				gd.subtype = GameEnums.GearSubtype.NONE
+		
+		gd.speed = entry.get("speed", 0)
+		gd.is_flying = entry.get("is_flying", false)
+		
 		var reverse_path = entry.get("texture_reverse", "")
 		var obverse_path = entry.get("texture_obverse", "")
 		if reverse_path:

@@ -11,6 +11,8 @@ func _init(p_gear: Gear, p_amount: int = 1, gm: GameManager = null, gs: GameStat
 	amount = p_amount
 
 func can_execute() -> bool:
+	if not game_manager.stack_manager.is_stack_empty():
+		return false
 	if not gear or not gear.can_rotate():
 		return false
 	if not gear.is_owned_by(game_state.active_player_id):
@@ -26,4 +28,3 @@ func execute() -> void:
 		game_state.t_pool[game_state.active_player_id] += amount
 		EventBus.t_pool_updated.emit(game_state.t_pool[0], game_state.t_pool[1])
 		GameLogger.info("Taken %d T from gear. Total T%d: %d" % [amount, game_state.active_player_id, game_state.t_pool[game_state.active_player_id]])
-		# Удален game_manager.update_ui()
