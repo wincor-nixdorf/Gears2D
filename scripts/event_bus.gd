@@ -22,6 +22,8 @@ signal target_selection_cancelled()
 signal gear_resolved(gear: Gear, was_face_up: bool)
 signal player_icon_clicked(player_id: int)
 signal target_selection_started()
+signal batch_ordering_requested(player_id: int, entries: Array)   # запрос на упорядочивание и выбор целей
+signal batch_ordering_completed(ordered_entries: Array)           # результат от UI
 
 # Сигналы для стека эффектов
 signal stack_updated(stack_snapshot: Array)           # массив словарей с данными о стеке

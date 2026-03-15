@@ -23,7 +23,7 @@ func _connect_signals():
 	event_bus.target_selection_cancelled.connect(_on_target_selection_cancelled)
 	event_bus.gear_resolved.connect(_on_gear_resolved)
 
-# --- Обработчики для статических и отложенных эффектов ---
+# --- Обработчики для событий ---
 func _on_gear_placed(gear: Gear, cell: Cell):
 	_trigger_abilities_on_gear(gear, GameEnums.TriggerCondition.ON_PLACED, {"source_gear": gear, "cell": cell})
 	
@@ -48,16 +48,10 @@ func _on_phase_changed(old_phase: Game.GamePhase, new_phase: Game.GamePhase):
 		_trigger_abilities_global(GameEnums.TriggerCondition.ON_PHASE_END, {"phase": old_phase})
 
 func _on_gear_resolved(gear: Gear, was_face_up: bool):
-	if not is_instance_valid(gear) or not gear.is_on_board():
-		return
-	
-	if was_face_up:
-		for ability in gear.abilities:
-			if ability.ability_type == GameEnums.AbilityType.TRIGGERED:
-				var context = {"source_gear": gear}
-				game_manager.stack_manager.push_effect(ability, gear, null, context)
+	# Триггерные способности теперь добавляются в стек непосредственно в gear.gd
+	pass
 
-# --- Обработка выбора цели (для статических эффектов, не для стека) ---
+# --- Обработка выбора цели (для триггерных способностей, которые требуют цели) ---
 func _on_target_selected(target: Object):
 	if target_selector.is_waiting:
 		await target_selector.select_target(target)
@@ -70,29 +64,24 @@ func _on_target_selection_cancelled():
 	else:
 		GameLogger.debug("Target selection cancelled but no waiting selector")
 
-# --- Методы для статических и отложенных эффектов (без стека) ---
-func _trigger_abilities_on_gear(gear: Gear, trigger: int, base_context: Dictionary):
-	for ability in gear.abilities:
-		if ability.trigger == trigger:
-			_handle_ability_static(ability, base_context)
+# --- Методы для обработки триггерных способностей по событиям ---
+func _trigger_abilities_on_gear(gear: Gear, trigger_condition: int, base_context: Dictionary):
+	for slot in gear.ability_slots:
+		if slot.type == GameEnums.AbilityType.TRIGGERED and slot.trigger == trigger_condition:
+			_handle_triggered_ability(slot.ability, gear, base_context)
 
-func _trigger_abilities_global(trigger: int, base_context: Dictionary):
+func _trigger_abilities_global(trigger_condition: int, base_context: Dictionary):
 	for gear in game_manager.get_board_manager().get_all_gears():
-		for ability in gear.abilities:
-			if ability.trigger == trigger:
-				_handle_ability_static(ability, base_context)
+		for slot in gear.ability_slots:
+			if slot.type == GameEnums.AbilityType.TRIGGERED and slot.trigger == trigger_condition:
+				_handle_triggered_ability(slot.ability, gear, base_context)
 
-func _handle_ability_static(ability: Ability, base_context: Dictionary):
-	# Статические и отложенные эффекты выполняются немедленно
+func _handle_triggered_ability(ability: Ability, source: Gear, base_context: Dictionary):
+	# Для триггерных способностей, сработавших по событию, добавляем их в стек
+	# Если способность требует цель, она будет запрошена при разрешении
 	if ability.target_type != GameEnums.TargetType.NO_TARGET:
-		var possible_targets = ability.get_possible_targets(base_context)
-		if possible_targets.is_empty():
-			return
-		if possible_targets.size() == 1:
-			base_context["target"] = possible_targets[0]
-			ability.execute(base_context)
-			return
-		# Для способностей с выбором цели используем TargetSelector
-		target_selector.request_selection(ability, base_context.get("source_gear"), possible_targets, base_context)
+		# В контексте может не быть цели, поэтому пока target = null
+		game_manager.stack_manager.push_effect(ability, source, null, base_context)
 	else:
-		ability.execute(base_context)
+		game_manager.stack_manager.push_effect(ability, source, null, base_context)
+	GameLogger.debug("Triggered ability %s from %s added to stack" % [ability.ability_name, source.gear_name])

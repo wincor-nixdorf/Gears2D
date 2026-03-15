@@ -28,9 +28,9 @@ func draw_card() -> Gear:
 		return null
 	var gear_data = deck.pop_front()
 	var gear = GEAR_SCENE.instantiate()
+	gear.set_game_manager(game_manager)   # устанавливаем game_manager ПЕРЕД apply_data
 	gear.apply_data(gear_data)
 	gear.owner_id = owner_id
-	gear.set_game_manager(game_manager)
 	gear.zone = Gear.Zone.HAND
 	hand.append(gear)
 	add_child(gear)
@@ -64,11 +64,11 @@ func return_gear_to_hand(gear: Gear) -> void:
 	if gear.get_parent():
 		gear.get_parent().remove_child(gear)
 	
-	GameState.effect_system.remove_modifiers_from_target(gear)
+	if game_manager and game_manager.game_state:
+		game_manager.game_state.effect_system.remove_modifiers_from_target(gear)
 	if game_manager:
 		game_manager.unregister_gear_effects(gear)
 	
-	# Отключаем сигналы от event_handler (кроме triggered – он не подключается)
 	if game_manager and game_manager.event_handler:
 		if gear.rotated.is_connected(game_manager.event_handler._on_gear_rotated):
 			gear.rotated.disconnect(game_manager.event_handler._on_gear_rotated)
@@ -82,7 +82,6 @@ func return_gear_to_hand(gear: Gear) -> void:
 			gear.mouse_exited.disconnect(game_manager.event_handler._on_gear_mouse_exited)
 	
 	gear.current_ticks = 0
-	gear.is_triggered = false
 	gear.is_face_up = false
 	gear.damage_taken = 0
 	gear.zone = Gear.Zone.HAND

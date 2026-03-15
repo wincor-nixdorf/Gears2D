@@ -9,9 +9,6 @@ var stack_manager: StackManager
 
 @export var ability_id: int
 @export var ability_name: String = ""
-@export var ability_type: GameEnums.AbilityType
-@export var trigger: int = -1
-@export var activation_cost: int = 0
 @export var target_type: GameEnums.TargetType = GameEnums.TargetType.NO_TARGET
 @export var description: String = ""
 

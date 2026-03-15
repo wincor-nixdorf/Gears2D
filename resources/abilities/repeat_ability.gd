@@ -1,11 +1,9 @@
-# repeat_ability.gd (добавлен async)
+# repeat_ability.gd
 extends Ability
 
 func _init():
 	ability_id = GameEnums.AbilityID.REPEAT
 	ability_name = "Repeat"
-	ability_type = GameEnums.AbilityType.TRIGGERED
-	trigger = GameEnums.TriggerCondition.ON_TRIGGER
 	description = "If this ability hasn't been used this round, restart chain resolution from the last placed gear."
 
 func execute(context: Dictionary) -> void:

@@ -4,8 +4,6 @@ extends Ability
 func _init():
 	ability_id = GameEnums.AbilityID.UPHEAVAL
 	ability_name = "Upheaval"
-	ability_type = GameEnums.AbilityType.TRIGGERED
-	trigger = GameEnums.TriggerCondition.ON_TRIGGER
 	description = "Flip all face-down gears not in the current chain."
 
 func execute(context: Dictionary) -> void:
@@ -29,7 +27,10 @@ func execute(context: Dictionary) -> void:
 	
 	GameLogger.debug("Upheaval: found %d targets" % targets.size())
 	
-	for gear in targets:
-		gear.flip()
+	# Начинаем пакет с указанием активного игрока (владельца источника)
+	game_manager.stack_manager.begin_batch(source.owner_id)
 	
-	# Автоматическое разрешение стека убрано – теперь только по кнопке
+	for gear in targets:
+		gear.flip()   # внутри flip() вызовет trigger(), который добавит способности в пакет
+	
+	game_manager.stack_manager.end_batch()

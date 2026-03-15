@@ -1,5 +1,6 @@
 # game_state.gd
-extends Node
+class_name GameState
+extends RefCounted
 
 var effect_system: EffectSystem = EffectSystem.new()
 

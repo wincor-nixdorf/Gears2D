@@ -42,13 +42,15 @@ func resolve_current_gear() -> void:
 	
 	var was_face_up = gear.is_face_up
 	var skip = game_state.effect_system.has_modifier(gear, "no_auto_tick")
-	if not skip and gear.can_rotate():
-		await gear.do_tick(1)
-		game_manager.update_ui()
+	
+	if gear.is_face_up:
+		gear.trigger()
+	else:
+		if not skip and gear.can_rotate():
+			await gear.do_tick(1)
 	
 	EventBus.gear_resolved.emit(gear, was_face_up)
 	
-	# Запускаем разрешение стека (игрок должен нажать кнопку)
 	game_state.waiting_for_player = true
 	game_manager.update_ui()
 
@@ -59,13 +61,12 @@ func _on_stack_resolved() -> void:
 		return
 	var gear = board_manager.get_gear_at(game_state.current_resolve_pos)
 	if not gear:
+		# шестерня уничтожена – переходим к следующей клетке
 		proceed_to_next_cell()
 		return
-	if gear.is_face_up:
-		proceed_to_next_cell()
-	else:
-		game_state.waiting_for_player = true
-		game_manager.update_ui()
+	# Возвращаем возможность действовать на текущей клетке
+	game_state.waiting_for_player = true
+	game_manager.update_ui()
 
 func get_next_cell() -> Vector2i:
 	var edges = game_state.chain_graph.get_edges_from(game_state.current_resolve_pos).duplicate()
@@ -119,26 +120,66 @@ func restart_chain_resolution() -> void:
 	await resolve_current_gear()
 
 func handle_gear_clicked(gear: Gear, button_index: int) -> void:
-	# В фазе разрешения используется только левая кнопка для extra tick
-	if button_index != MOUSE_BUTTON_LEFT:
-		return
+	if button_index == MOUSE_BUTTON_LEFT:
+		GameLogger.debug("ResolutionPhase handle_gear_clicked left: " + gear.gear_name)
+		if not game_state.waiting_for_player:
+			GameLogger.debug("Not waiting for player, ignoring")
+			return
+		if gear != board_manager.get_gear_at(game_state.current_resolve_pos):
+			GameLogger.debug("Gear mismatch: clicked gear not at current resolve pos")
+			return
+		
+		var cmd = ExtraTickCommand.new(gear, game_manager, game_state)
+		if cmd.can_execute():
+			await cmd.execute()
+		else:
+			if not gear.can_rotate():
+				GameLogger.warning("Cannot spend T on extra tick: gear is already face up or cannot rotate")
+			else:
+				GameLogger.warning("Could not spend T on extra tick")
 	
-	GameLogger.debug("ResolutionPhase handle_gear_clicked: " + gear.gear_name)
+	elif button_index == MOUSE_BUTTON_RIGHT:
+		GameLogger.debug("ResolutionPhase handle_gear_clicked right: " + gear.gear_name)
+		if not game_state.waiting_for_player:
+			GameLogger.debug("Not waiting for player, ignoring")
+			return
+		if gear != board_manager.get_gear_at(game_state.current_resolve_pos):
+			GameLogger.debug("Gear mismatch: clicked gear not at current resolve pos")
+			return
+		
+		# Ищем активируемую способность
+		for i in range(gear.ability_slots.size()):
+			var slot = gear.ability_slots[i]
+			if slot.type == GameEnums.AbilityType.ACTIVATED:
+				activate_ability(gear, i)
+				return
+		GameLogger.debug("No activated ability found on this gear")
+
+func activate_ability(gear: Gear, slot_index: int) -> void:
 	if not game_state.waiting_for_player:
-		GameLogger.debug("Not waiting for player, ignoring")
+		GameLogger.debug("Cannot activate ability while not waiting for player")
 		return
 	if gear != board_manager.get_gear_at(game_state.current_resolve_pos):
-		GameLogger.debug("Gear mismatch: clicked gear not at current resolve pos")
+		GameLogger.debug("Gear mismatch: trying to activate ability of wrong gear")
+		return
+	if slot_index < 0 or slot_index >= gear.ability_slots.size():
+		return
+	var slot = gear.ability_slots[slot_index]
+	if slot.type != GameEnums.AbilityType.ACTIVATED:
+		GameLogger.debug("Not an activated ability")
+		return
+	if game_state.t_pool[gear.owner_id] < slot.cost:
+		GameLogger.warning("Not enough T to activate ability (need %d, have %d)" % [slot.cost, game_state.t_pool[gear.owner_id]])
 		return
 	
-	var cmd = ExtraTickCommand.new(gear, game_manager, game_state)
-	if cmd.can_execute():
-		await cmd.execute()
-	else:
-		if not gear.can_rotate():
-			GameLogger.warning("Cannot spend T on extra tick: gear is already face up or cannot rotate")
-		else:
-			GameLogger.warning("Could not spend T on extra tick")
+	game_state.t_pool[gear.owner_id] -= slot.cost
+	EventBus.t_pool_updated.emit(game_state.t_pool[0], game_state.t_pool[1])
+	
+	var context = {"source_gear": gear}
+	game_manager.stack_manager.push_effect(slot.ability, gear, null, context)
+	GameLogger.info("Activated ability %s for %d T" % [slot.ability.ability_name, slot.cost])
+	
+	game_manager.update_ui()
 
 func handle_cell_clicked(cell: Cell) -> void:
 	if game_state.waiting_for_player and cell.board_pos == game_state.current_resolve_pos:

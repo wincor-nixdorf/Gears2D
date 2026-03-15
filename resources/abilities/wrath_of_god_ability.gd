@@ -4,8 +4,6 @@ extends Ability
 func _init():
 	ability_id = GameEnums.AbilityID.WRATH_OF_GOD
 	ability_name = "Wrath Of God"
-	ability_type = GameEnums.AbilityType.TRIGGERED
-	trigger = GameEnums.TriggerCondition.ON_TRIGGER
 	description = "When triggered, destroy all gears in the current chain."
 
 func execute(context: Dictionary):

@@ -2,15 +2,25 @@
 class_name Gear
 extends Node2D
 
-# Перечисление зон
 enum Zone {
-	HAND,   # в руке
-	BOARD,  # на доске
-	GRAVE,  # в сбросе (уничтожена)
-	EXILE   # изгнана (безвозвратно)
+	HAND,
+	BOARD,
+	GRAVE,
+	EXILE
 }
 
-# Сигналы
+class AbilitySlot:
+	var ability: Ability
+	var type: GameEnums.AbilityType
+	var cost: int
+	var trigger: int  # условие для триггерных, -1 для остальных
+	
+	func _init(p_ability: Ability, p_type: GameEnums.AbilityType, p_cost: int, p_trigger: int):
+		ability = p_ability
+		type = p_type
+		cost = p_cost
+		trigger = p_trigger
+
 signal rotated(gear: Gear, old_ticks: int, new_ticks: int)
 signal triggered(gear: Gear)
 signal destroyed(gear: Gear)
@@ -18,7 +28,6 @@ signal clicked(gear: Gear, button_index: int)
 signal mouse_entered(gear: Gear)
 signal mouse_exited(gear: Gear)
 
-# Параметры шестерни
 var gear_name: String = "Generic Gear"
 var supertype: GameEnums.GearSupertype = GameEnums.GearSupertype.NONE
 var type: GameEnums.GearType = GameEnums.GearType.ROUTINE
@@ -31,13 +40,11 @@ var max_tocks: int = 2
 var texture_reverse: Texture2D
 var texture_obverse: Texture2D
 
-# Состояние
 var zone: Zone = Zone.HAND
 var is_face_up: bool = false
 var current_ticks: int = 0
-var is_triggered: bool = false
 var board_position: Vector2i = Vector2i(-1, -1)
-var abilities: Array[Ability] = []
+var ability_slots: Array[AbilitySlot] = []
 var damage_taken: int = 0
 
 var game_manager: GameManager
@@ -52,16 +59,11 @@ func set_game_manager(gm: GameManager) -> void:
 	game_manager = gm
 
 func _ready() -> void:
-	if texture_reverse:
-		sprite.texture = texture_reverse
-	else:
-		push_error("Gear: texture_reverse not assigned!")
-	update_rotation()
 	click_area.input_event.connect(_on_click_area_input)
 	click_area.mouse_entered.connect(_on_mouse_entered)
 	click_area.mouse_exited.connect(_on_mouse_exited)
+	update_texture()
 
-# Заполняет данные из GearData
 func apply_data(data: GearData) -> void:
 	gear_name = data.gear_name
 	supertype = data.supertype
@@ -73,50 +75,58 @@ func apply_data(data: GearData) -> void:
 	max_tocks = data.max_tocks
 	texture_reverse = data.texture_reverse
 	texture_obverse = data.texture_obverse
-	abilities = data.abilities.duplicate()
 	damage_taken = 0
-	if sprite:
-		if texture_reverse:
-			sprite.texture = texture_reverse
-		update_rotation()
+	
+	ability_slots.clear()
+	for slot_data in data.ability_slots:
+		var ability = game_manager.get_ability_by_id(slot_data.ability_id)
+		if ability:
+			var slot = AbilitySlot.new(ability, slot_data.type, slot_data.cost, slot_data.trigger)
+			ability_slots.append(slot)
+	
+	update_texture()
+	update_rotation()
 
-# Устанавливает размер спрайта в соответствии с размером клетки
+func update_texture() -> void:
+	if not sprite:
+		return
+	if is_face_up and texture_obverse:
+		sprite.texture = texture_obverse
+	elif texture_reverse:
+		sprite.texture = texture_reverse
+	else:
+		sprite.texture = null
+
 func set_cell_size(cell_size: float, indent: float = 0.9) -> void:
-	var spr = $Sprite
-	if not spr:
+	if not sprite:
 		return
 	var target_size = cell_size * indent
-	if spr.texture:
-		var tex_size = spr.texture.get_size()
-		spr.scale = Vector2(target_size / tex_size.x, target_size / tex_size.y)
+	if sprite.texture:
+		var tex_size = sprite.texture.get_size()
+		sprite.scale = Vector2(target_size / tex_size.x, target_size / tex_size.y)
 	else:
-		spr.scale = Vector2(target_size / 100.0, target_size / 100.0)
+		sprite.scale = Vector2(target_size / 100.0, target_size / 100.0)
 	if collision_shape:
 		if collision_shape.shape == null or not (collision_shape.shape is CircleShape2D):
 			var new_shape = CircleShape2D.new()
 			collision_shape.shape = new_shape
 		collision_shape.shape.radius = target_size / 2.0
 
-# Обновляет вращение спрайта в соответствии с current_ticks
 func update_rotation() -> void:
 	if not sprite:
 		return
 	sprite.rotation_degrees = current_ticks * 30.0
 
-# Анимирует поворот к заданному количеству тиков
 func _animate_rotation(target_ticks: int) -> void:
 	if _current_tween and _current_tween.is_valid():
 		_current_tween.kill()
-	
 	var target_angle = target_ticks * 30.0
 	_current_tween = create_tween()
 	_current_tween.tween_property(sprite, "rotation_degrees", target_angle, 0.5)\
 		.set_ease(Tween.EASE_IN_OUT)\
 		.set_trans(Tween.TRANS_LINEAR)
-	
 	await _current_tween.finished
 
-# Выполняет поворот на указанное количество тиков вперёд
 func do_tick(ticks: int = 1) -> bool:
 	if is_face_up:
 		return false
@@ -131,7 +141,6 @@ func do_tick(ticks: int = 1) -> bool:
 	rotated.emit(self, old_ticks, current_ticks)
 	return true
 
-# Выполняет поворот на указанное количество тиков назад (так)
 func do_tock(ticks: int = 1) -> bool:
 	if is_face_up:
 		return false
@@ -146,50 +155,35 @@ func do_tock(ticks: int = 1) -> bool:
 	rotated.emit(self, old_ticks, current_ticks)
 	return true
 
-# Переворот шестерни (лицевой стороной вверх)
 func flip() -> void:
 	if is_face_up:
 		return
 	is_face_up = true
-	if texture_obverse:
-		sprite.texture = texture_obverse
+	update_texture()
 	sprite.rotation_degrees = 0
-	
-	# 1. Немедленное выполнение статических способностей
 	_apply_static_effects()
-	
-	# 2. Если есть триггерные способности, добавляем их в стек
-	if _has_trigger_abilities() and not is_triggered:
+	if _has_trigger_abilities():
 		trigger()
-	
 	triggered.emit(self)
 
-# Применяет все статические способности шестерни
 func _apply_static_effects() -> void:
-	for ability in abilities:
-		if ability.ability_type == GameEnums.AbilityType.STATIC:
-			ability.execute({"source_gear": self})
+	for slot in ability_slots:
+		if slot.type == GameEnums.AbilityType.STATIC:
+			slot.ability.execute({"source_gear": self})
 
-# Проверяет наличие триггерных способностей
 func _has_trigger_abilities() -> bool:
-	for ability in abilities:
-		if ability.ability_type == GameEnums.AbilityType.TRIGGERED:
+	for slot in ability_slots:
+		if slot.type == GameEnums.AbilityType.TRIGGERED and slot.trigger == GameEnums.TriggerCondition.ON_TRIGGER:
 			return true
 	return false
 
-# Добавляет триггерные способности в стек
 func trigger() -> void:
-	if is_triggered:
-		return
-	is_triggered = true
-	
-	for ability in abilities:
-		if ability.ability_type == GameEnums.AbilityType.TRIGGERED:
+	for slot in ability_slots:
+		if slot.type == GameEnums.AbilityType.TRIGGERED and slot.trigger == GameEnums.TriggerCondition.ON_TRIGGER:
 			var context = {"source_gear": self}
-			GameLogger.debug("Gear %s: adding ability %s to stack" % [gear_name, ability.ability_name])
-			game_manager.stack_manager.push_effect(ability, self, null, context)
+			GameLogger.debug("Gear %s: adding ability %s to stack" % [gear_name, slot.ability.ability_name])
+			game_manager.stack_manager.push_effect(slot.ability, self, null, context)
 
-# Уничтожает шестерню
 func destroy() -> void:
 	zone = Zone.GRAVE
 	var cell = get_parent() as Cell
@@ -198,29 +192,26 @@ func destroy() -> void:
 	destroyed.emit(self)
 	queue_free()
 
-# Наносит урон шестерне
 func take_damage(amount: int) -> void:
-	damage_taken += amount
-	var total_groove = max_ticks + max_tocks
-	if damage_taken >= total_groove:
-		destroy()
+	if is_face_up:
+		damage_taken += amount
+		if damage_taken >= max_ticks + max_tocks:
+			destroy()
+	else:
+		do_tock(amount)
 
-# Проверяет, может ли шестерня вращаться (не перевёрнута)
 func can_rotate() -> bool:
 	return not is_face_up
 
-# Проверяет, принадлежит ли шестерня указанному игроку
 func is_owned_by(player: int) -> bool:
 	return owner_id == player
 
-# Проверяет наличие способности с заданным ID
 func has_ability_id(aid: int) -> bool:
-	for a in abilities:
-		if a.ability_id == aid:
+	for slot in ability_slots:
+		if slot.ability.ability_id == aid:
 			return true
 	return false
 
-# Возвращает строку типа (например, "Legendary Creature — Gearling")
 func get_type_line() -> String:
 	var line = ""
 	if supertype != GameEnums.GearSupertype.NONE:
@@ -230,21 +221,25 @@ func get_type_line() -> String:
 		line += " — " + GameEnums.GearSubtype.keys()[subtype]
 	return line
 
-# Возвращает строку с описанием способностей
 func get_abilities_description() -> String:
-	if abilities.is_empty():
+	if ability_slots.is_empty():
 		return "No abilities"
 	var desc = ""
-	for ability in abilities:
-		desc += ability.description + "\n"
+	for slot in ability_slots:
+		var prefix = ""
+		match slot.type:
+			GameEnums.AbilityType.TRIGGERED:
+				prefix = "Triggered: "
+			GameEnums.AbilityType.ACTIVATED:
+				prefix = "Activated (%d T): " % slot.cost
+			GameEnums.AbilityType.STATIC:
+				prefix = "Static: "
+		desc += prefix + slot.ability.description + "\n"
 	return desc.strip_edges()
 
-# Возвращает текст для подсказки
 func get_tooltip_text() -> String:
 	var owner_str = "Player 1" if owner_id == 0 else "Player 2"
-	
 	var type_line = get_type_line()
-	
 	var abilities_desc = get_abilities_description()
 	var base = "Gear: %s\n%s\nTocks: %d\nTicks: %d\nTime: %d\nOwner: %s" % [
 		gear_name, type_line, max_tocks, max_ticks, current_ticks, owner_str
@@ -259,7 +254,6 @@ func get_tooltip_text() -> String:
 		base += "\n\n%s" % abilities_desc
 	return base
 
-# Показывает аверс на короткое время (для фазы upturn)
 func show_obverse_temporarily() -> void:
 	if not texture_obverse:
 		return
@@ -278,22 +272,20 @@ func _on_click_area_input(viewport: Node, event: InputEvent, shape_idx: int) -> 
 		viewport.set_input_as_handled()
 
 func _on_mouse_entered() -> void:
-	if game_manager and game_manager.ui.is_target_selection_active():
+	if GameManager.ref and GameManager.ref.ui and GameManager.ref.ui.is_target_selection_active():
 		return
 	modulate = Color(1, 1, 0.8)
 	mouse_entered.emit(self)
 
 func _on_mouse_exited() -> void:
-	if game_manager and game_manager.ui.is_target_selection_active():
+	if GameManager.ref and GameManager.ref.ui and GameManager.ref.ui.is_target_selection_active():
 		return
 	modulate = Color.WHITE
 	mouse_exited.emit(self)
 
-# Проверяет, находится ли шестерня на доске
 func is_on_board() -> bool:
 	return zone == Zone.BOARD
 
-# Визуальное выделение существа
 func set_selected(selected: bool) -> void:
 	if selected:
 		modulate = Color.YELLOW

@@ -9,6 +9,7 @@ enum AbilityID {
 	SPARK,
 	WRATH_OF_GOD,
 	UPHEAVAL,
+	ACTIVATED_SPARK,
 }
 
 enum TriggerCondition {
@@ -54,5 +55,6 @@ enum GearSubtype {
 	GREMLIN,
 	GOBLIN,
 	GIANT,
-	GANGSTER
+	GANGSTER,
+	GUTTERBORN
 }

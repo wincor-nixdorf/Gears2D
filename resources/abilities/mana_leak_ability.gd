@@ -4,8 +4,6 @@ extends Ability
 func _init():
 	ability_id = GameEnums.AbilityID.MANA_LEAK
 	ability_name = "Mana Leak"
-	ability_type = GameEnums.AbilityType.TRIGGERED
-	trigger = GameEnums.TriggerCondition.ON_TRIGGER
 	description = "When triggered, prevent the next trigger of an enemy gear."
 
 func execute(context: Dictionary):
@@ -13,7 +11,5 @@ func execute(context: Dictionary):
 	if not source:
 		return
 	# Добавляем одно предотвращение для владельца source (т.е. для его противника)
-	# Счётчик хранится по owner_id владельца способности – при проверке мы будем смотреть enemy_id.
-	# Увеличиваем счётчик для source.owner_id – это означает, что следующий триггер врага (enemy_id = 1 - source.owner_id) будет предотвращён.
 	effect_system.add_prevent(source.owner_id)
 	GameLogger.debug("Mana Leak activated, will prevent next enemy trigger")

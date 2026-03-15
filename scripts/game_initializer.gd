@@ -1,4 +1,4 @@
-# game_initializer.gd
+# game_initializer.gd (полный код с использованием AbilitySlotData)
 class_name GameInitializer
 extends RefCounted
 
@@ -6,6 +6,9 @@ var game_manager: GameManager
 var board: Node2D
 var players_scene = preload("res://scenes/Player.tscn")
 var gear_scene = preload("res://scenes/Gear.tscn")
+
+# Словарь для кеширования способностей по ID
+var abilities_by_id: Dictionary = {}
 
 func _init(gm: GameManager, board_node: Node2D):
 	game_manager = gm
@@ -58,7 +61,6 @@ func load_decks_from_json(path: String) -> Array[GearData]:
 		var gd = GearData.new()
 		gd.gear_name = entry.get("name", "Unknown")
 		
-		# supertype
 		var super_str = entry.get("supertype", "")
 		match super_str:
 			"Legendary":
@@ -66,7 +68,6 @@ func load_decks_from_json(path: String) -> Array[GearData]:
 			_:
 				gd.supertype = GameEnums.GearSupertype.NONE
 		
-		# type
 		var type_str = entry.get("type", "Routine")
 		match type_str:
 			"Creature":
@@ -76,7 +77,6 @@ func load_decks_from_json(path: String) -> Array[GearData]:
 			_:
 				gd.type = GameEnums.GearType.ROUTINE
 		
-		# subtype
 		var sub_str = entry.get("subtype", "")
 		match sub_str:
 			"Gearling":
@@ -89,8 +89,10 @@ func load_decks_from_json(path: String) -> Array[GearData]:
 				gd.subtype = GameEnums.GearSubtype.GOBLIN
 			"Giant":
 				gd.subtype = GameEnums.GearSubtype.GIANT
-			"Pirate":
+			"Pirate", "Gangster":
 				gd.subtype = GameEnums.GearSubtype.GANGSTER
+			"Gutterborn":
+				gd.subtype = GameEnums.GearSubtype.GUTTERBORN
 			_:
 				gd.subtype = GameEnums.GearSubtype.NONE
 		
@@ -105,13 +107,27 @@ func load_decks_from_json(path: String) -> Array[GearData]:
 			gd.texture_obverse = load(obverse_path)
 		gd.max_ticks = entry.get("max_ticks", 3)
 		gd.max_tocks = entry.get("max_tocks", 2)
-		var ability_ids = entry.get("abilities", [])
-		for aid in ability_ids:
-			var ability = create_ability_by_id(aid)
-			if ability:
-				gd.abilities.append(ability)
+		
+		var ability_slots_data = entry.get("ability_slots", [])
+		gd.ability_slots.clear()
+		for slot_data in ability_slots_data:
+			var slot = AbilitySlotData.new()
+			slot.ability_id = slot_data.get("ability_id", -1)
+			slot.type = slot_data.get("type", 0)
+			slot.cost = slot_data.get("cost", 0)
+			slot.trigger = slot_data.get("trigger", -1)
+			gd.ability_slots.append(slot)
+		
 		result.append(gd)
 	return result
+
+func get_ability_by_id(id: int) -> Ability:
+	if abilities_by_id.has(id):
+		return abilities_by_id[id]
+	var ability = create_ability_by_id(id)
+	if ability:
+		abilities_by_id[id] = ability
+	return ability
 
 func create_ability_by_id(id: int) -> Ability:
 	var script_path = ""
@@ -130,6 +146,8 @@ func create_ability_by_id(id: int) -> Ability:
 			script_path = "res://resources/abilities/wrath_of_god_ability.gd"
 		GameEnums.AbilityID.UPHEAVAL:
 			script_path = "res://resources/abilities/upheaval_ability.gd"
+		GameEnums.AbilityID.ACTIVATED_SPARK:
+			script_path = "res://resources/abilities/spark_ability.gd"
 		_:
 			return null
 	

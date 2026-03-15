@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://caayvs44uk3xs"
-path="res://.godot/imported/Revers2.png-ed9d53f91cc5279b034bb791136f832c.ctex"
+uid="uid://cfyb1m6f81udk"
+path="res://.godot/imported/Reverse2.png-53a73a923ece6523ab032b8cb0cdfac7.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/gears/Revers2.png"
-dest_files=["res://.godot/imported/Revers2.png-ed9d53f91cc5279b034bb791136f832c.ctex"]
+source_file="res://assets/gears/Reverse2.png"
+dest_files=["res://.godot/imported/Reverse2.png-53a73a923ece6523ab032b8cb0cdfac7.ctex"]
 
 [params]
 

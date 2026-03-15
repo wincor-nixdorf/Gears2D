@@ -31,6 +31,13 @@ signal hand_gear_selected(gear: Node2D)
 @onready var clear_log_button: Button = %ClearLogButton
 @onready var tooltip_icon: TextureRect = %TooltipIcon
 
+# Для временного диалога упорядочивания батча
+var _batch_dialog: Window = null
+var _batch_entries: Array = []
+var _batch_player_id: int
+var _batch_ordered: Array = []
+var _batch_confirm_button: Button = null
+
 var _target_selection_active: bool = false
 var _current_possible_targets: Array = []
 var _original_colors: Dictionary = {}
@@ -49,6 +56,7 @@ func _ready() -> void:
 	
 	EventBus.target_selection_requested.connect(_on_target_selection_requested)
 	EventBus.target_selection_cancelled.connect(_on_target_selection_cancelled)
+	EventBus.batch_ordering_requested.connect(_on_batch_ordering_requested)
 	
 	player0_button.pressed.connect(_on_player_button_pressed.bind(0))
 	player1_button.pressed.connect(_on_player_button_pressed.bind(1))
@@ -161,7 +169,6 @@ func fill_hand_container(container: HBoxContainer, hand: Array, is_active: bool,
 			button.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
 			button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		
-		# Сбор информации для текста
 		var type_line = gear.get_type_line()
 		var abilities_text = gear.get_abilities_description()
 		var speed_text = ""
@@ -398,3 +405,106 @@ func is_target_selection_active() -> bool:
 
 func is_valid_target(obj: Object) -> bool:
 	return obj in _current_possible_targets
+
+# ---------- Обработка батча (только упорядочивание, без выбора целей) ----------
+func _on_batch_ordering_requested(player_id: int, entries: Array) -> void:
+	GameLogger.debug("UI: batch ordering requested for player %d with %d entries" % [player_id, entries.size()])
+	
+	if _batch_dialog and is_instance_valid(_batch_dialog):
+		_batch_dialog.queue_free()
+		_batch_dialog = null
+	
+	_batch_player_id = player_id
+	_batch_entries = entries.duplicate()
+	_batch_ordered = entries.duplicate()
+	
+	var dialog = Window.new()
+	dialog.title = "Order Abilities (Player %d)" % (player_id + 1)
+	dialog.size = Vector2(500, 300)
+	dialog.exclusive = true
+	dialog.unresizable = false
+	dialog.wrap_controls = true
+	add_child(dialog)
+	dialog.popup_centered()
+	_batch_dialog = dialog
+	
+	var vbox = VBoxContainer.new()
+	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vbox.anchor_right = 1.0
+	vbox.anchor_bottom = 1.0
+	dialog.add_child(vbox)
+	
+	var label = Label.new()
+	label.text = "Arrange your triggered abilities (top will resolve last):"
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	vbox.add_child(label)
+	
+	var list_container = VBoxContainer.new()
+	list_container.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vbox.add_child(list_container)
+	
+	var confirm_btn = Button.new()
+	confirm_btn.text = "Confirm"
+	confirm_btn.disabled = false
+	confirm_btn.pressed.connect(_on_batch_confirm.bind(list_container))
+	vbox.add_child(confirm_btn)
+	_batch_confirm_button = confirm_btn
+	
+	var cancel_btn = Button.new()
+	cancel_btn.text = "Cancel"
+	cancel_btn.pressed.connect(_on_batch_cancel)
+	vbox.add_child(cancel_btn)
+	
+	_update_batch_list(list_container)
+
+func _update_batch_list(container: VBoxContainer) -> void:
+	for child in container.get_children():
+		child.queue_free()
+	
+	for i in range(_batch_ordered.size()):
+		var entry = _batch_ordered[i]
+		var hbox = HBoxContainer.new()
+		container.add_child(hbox)
+		
+		var text = "%s from %s" % [entry.ability.ability_name, entry.source.gear_name]
+		if entry.ability.target_type != GameEnums.TargetType.NO_TARGET:
+			text += " (needs target)"
+		var label = Label.new()
+		label.text = text
+		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		hbox.add_child(label)
+		
+		if i > 0:
+			var up_btn = Button.new()
+			up_btn.text = "↑"
+			up_btn.pressed.connect(_move_entry.bind(i, -1, container))
+			hbox.add_child(up_btn)
+		if i < _batch_ordered.size() - 1:
+			var down_btn = Button.new()
+			down_btn.text = "↓"
+			down_btn.pressed.connect(_move_entry.bind(i, 1, container))
+			hbox.add_child(down_btn)
+
+func _move_entry(index: int, delta: int, list_container: VBoxContainer) -> void:
+	var new_index = index + delta
+	if new_index < 0 or new_index >= _batch_ordered.size():
+		return
+	var temp = _batch_ordered[index]
+	_batch_ordered[index] = _batch_ordered[new_index]
+	_batch_ordered[new_index] = temp
+	_update_batch_list(list_container)
+
+func _on_batch_confirm(list_container: VBoxContainer) -> void:
+	GameLogger.debug("UI: batch confirmed with %d entries" % _batch_ordered.size())
+	if _batch_dialog:
+		_batch_dialog.queue_free()
+		_batch_dialog = null
+	EventBus.batch_ordering_completed.emit(_batch_ordered)
+
+func _on_batch_cancel() -> void:
+	GameLogger.debug("UI: batch cancelled, returning original order")
+	if _batch_dialog:
+		_batch_dialog.queue_free()
+		_batch_dialog = null
+	EventBus.batch_ordering_completed.emit(_batch_entries)

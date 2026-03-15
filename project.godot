@@ -20,7 +20,6 @@ config/icon="res://icon.svg"
 Game="*res://scripts/Game.gd"
 GameLogger="*res://scripts/logger.gd"
 EventBus="*res://scripts/event_bus.gd"
-GameState="*res://scripts/game_state.gd"
 
 [display]
 

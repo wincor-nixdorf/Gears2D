@@ -12,4 +12,4 @@ extends Resource
 @export var texture_obverse: Texture2D
 @export var max_ticks: int = 3
 @export var max_tocks: int = 2
-@export var abilities: Array[Ability] = []
+@export var ability_slots: Array[AbilitySlotData] = []

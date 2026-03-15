@@ -8,7 +8,7 @@ class StackEntry:
 	var target: Object
 	var context: Dictionary
 	var id: int
-	var source_pos: Vector2i   # позиция источника (для отображения)
+	var source_pos: Vector2i
 	
 	static var _next_id: int = 0
 	
@@ -35,12 +35,12 @@ class StackEntry:
 			"context": context.duplicate()
 		}
 
-var _stacks: Dictionary = {
-	0: [],
-	1: []
-}
-
+var _stack: Array[StackEntry] = []
 var _pending_target_entry: StackEntry = null
+var _batch_mode: bool = false
+var _pending_batch: Array[StackEntry] = []
+var _batch_active_player: int = -1
+var _batch_in_progress: bool = false
 var _game_manager: GameManager
 var _game_state: GameState
 var _event_bus: EventBus
@@ -52,25 +52,79 @@ func _init(gm: GameManager, gs: GameState, eb: EventBus):
 	_event_bus.target_selected.connect(_on_target_selected)
 	_event_bus.target_selection_cancelled.connect(_on_target_selection_cancelled)
 
+func begin_batch(active_player_id: int) -> void:
+	_batch_mode = true
+	_batch_in_progress = true
+	_batch_active_player = active_player_id
+	_pending_batch.clear()
+
+func end_batch() -> void:
+	_batch_mode = false
+	if _pending_batch.is_empty():
+		_batch_in_progress = false
+		return
+	_process_batch()
+
 func push_effect(ability: Ability, source: Gear, target: Object = null, context: Dictionary = {}) -> void:
 	if not source:
 		push_error("StackManager: push_effect called without source")
 		return
-	var owner_id = source.owner_id
-	_stacks[owner_id].push_front(StackEntry.new(ability, source, target, context))
-	GameLogger.debug("Stack: pushed effect %s from %s at %s" % [ability.ability_name, source.gear_name, Game.pos_to_chess(source.board_position)])
-	_event_bus.stack_updated.emit(_get_stack_snapshot())
+	var entry = StackEntry.new(ability, source, target, context)
+	if _batch_mode:
+		_pending_batch.append(entry)
+		GameLogger.debug("Stack (batch): added effect %s from %s" % [ability.ability_name, source.gear_name])
+	else:
+		_stack.push_front(entry)
+		GameLogger.debug("Stack: pushed effect %s from %s at %s" % [ability.ability_name, source.gear_name, Game.pos_to_chess(source.board_position)])
+		_event_bus.stack_updated.emit(get_stack_snapshot())
+
+func _process_batch() -> void:
+	var active_id = _batch_active_player
+	var active_entries: Array[StackEntry] = []
+	var inactive_entries: Array[StackEntry] = []
+	
+	for entry in _pending_batch:
+		if entry.source.owner_id == active_id:
+			active_entries.append(entry)
+		else:
+			inactive_entries.append(entry)
+	
+	GameLogger.debug("Processing batch: active_id=%d, active_entries=%d, inactive_entries=%d" % [active_id, active_entries.size(), inactive_entries.size()])
+	
+	var active_ordered: Array[StackEntry] = []
+	if not active_entries.is_empty():
+		_event_bus.batch_ordering_requested.emit(active_id, active_entries)
+		var result = await _event_bus.batch_ordering_completed
+		active_ordered = result if result != null else active_entries
+		GameLogger.debug("Active player %d returned %d entries" % [active_id, active_ordered.size()])
+	
+	var inactive_ordered: Array[StackEntry] = []
+	if not inactive_entries.is_empty():
+		_event_bus.batch_ordering_requested.emit(1 - active_id, inactive_entries)
+		var result = await _event_bus.batch_ordering_completed
+		inactive_ordered = result if result != null else inactive_entries
+		GameLogger.debug("Inactive player %d returned %d entries" % [1 - active_id, inactive_ordered.size()])
+	
+	# Формируем стек: сначала активные (будут внизу), потом неактивные (сверху)
+	# Внутри каждой группы порядок прямой (первый в списке станет последним в своей группе из-за push_front)
+	_stack.clear()
+	
+	# Добавляем активные в прямом порядке (они окажутся внизу стека)
+	for i in range(active_ordered.size()):
+		_stack.push_front(active_ordered[i])
+	
+	# Добавляем неактивные в прямом порядке (они будут добавлены перед активными, т.е. сверху)
+	for i in range(inactive_ordered.size()):
+		_stack.push_front(inactive_ordered[i])
+	
+	_pending_batch.clear()
+	_batch_in_progress = false
+	_event_bus.stack_updated.emit(get_stack_snapshot())
+	GameLogger.debug("Batch processed, stack size: %d" % _stack.size())
 
 func get_stack_snapshot() -> Array:
-	return _get_stack_snapshot()
-
-func _get_stack_snapshot() -> Array:
-	var all_entries = []
-	all_entries.append_array(_stacks[1])
-	all_entries.append_array(_stacks[0])
-	
 	var snapshot = []
-	for entry in all_entries:
+	for entry in _stack:
 		snapshot.append(entry.to_dict())
 	return snapshot
 
@@ -79,19 +133,13 @@ func resolve_next() -> void:
 		GameLogger.debug("Cannot resolve next while waiting for target selection")
 		return
 	
-	if _stacks[0].is_empty() and _stacks[1].is_empty():
-		_event_bus.stack_resolved.emit()
-		_event_bus.stack_updated.emit(_get_stack_snapshot())
+	if _stack.is_empty():
+		if not _batch_in_progress:
+			_event_bus.stack_resolved.emit()
+			_event_bus.stack_updated.emit(get_stack_snapshot())
 		return
 	
-	var entry: StackEntry
-	if not _stacks[1].is_empty():
-		entry = _stacks[1].pop_front()
-	elif not _stacks[0].is_empty():
-		entry = _stacks[0].pop_front()
-	else:
-		return
-	
+	var entry = _stack.pop_front()
 	var entry_data = entry.to_dict()
 	_event_bus.stack_step_started.emit(entry_data)
 	GameLogger.debug("Stack: resolving effect %s from %s" % [entry.ability.ability_name, entry.source.gear_name])
@@ -101,9 +149,8 @@ func resolve_next() -> void:
 		if possible_targets.is_empty():
 			GameLogger.debug("Ability %s has no valid targets, skipping" % entry.ability.ability_name)
 			_event_bus.stack_step_finished.emit(entry_data)
-			_event_bus.stack_updated.emit(_get_stack_snapshot())
-			# Проверяем, не стал ли стек пуст после пропуска
-			if _stacks[0].is_empty() and _stacks[1].is_empty() and _pending_target_entry == null:
+			_event_bus.stack_updated.emit(get_stack_snapshot())
+			if _stack.is_empty() and _pending_target_entry == null and not _batch_in_progress:
 				_event_bus.stack_resolved.emit()
 			return
 		
@@ -115,12 +162,18 @@ func resolve_next() -> void:
 	
 	await _execute_entry(entry)
 	_event_bus.stack_step_finished.emit(entry_data)
-	_event_bus.stack_updated.emit(_get_stack_snapshot())
-	# После выполнения проверяем, не стал ли стек пуст
-	if _stacks[0].is_empty() and _stacks[1].is_empty() and _pending_target_entry == null:
+	_event_bus.stack_updated.emit(get_stack_snapshot())
+	if _stack.is_empty() and _pending_target_entry == null and not _batch_in_progress:
 		_event_bus.stack_resolved.emit()
 
 func _execute_entry(entry: StackEntry) -> void:
+	# Проверка легальности цели на момент разрешения
+	if entry.target != null and entry.ability.target_type != GameEnums.TargetType.NO_TARGET:
+		var possible_targets = entry.ability.get_possible_targets({"source_gear": entry.source})
+		if entry.target not in possible_targets:
+			GameLogger.debug("Ability %s: target is no longer legal, fizzles" % entry.ability.ability_name)
+			return  # способность проваливается
+	
 	var context = entry.context.duplicate()
 	context["source_gear"] = entry.source
 	if entry.target:
@@ -141,9 +194,8 @@ func _on_target_selected(target: Object) -> void:
 	await _execute_entry(entry)
 	
 	_event_bus.stack_step_finished.emit(entry.to_dict())
-	_event_bus.stack_updated.emit(_get_stack_snapshot())
-	# После выполнения проверяем, не стал ли стек пуст
-	if _stacks[0].is_empty() and _stacks[1].is_empty() and _pending_target_entry == null:
+	_event_bus.stack_updated.emit(get_stack_snapshot())
+	if _stack.is_empty() and _pending_target_entry == null and not _batch_in_progress:
 		_event_bus.stack_resolved.emit()
 
 func _on_target_selection_cancelled() -> void:
@@ -152,17 +204,15 @@ func _on_target_selection_cancelled() -> void:
 	
 	GameLogger.debug("Stack: target selection cancelled for %s" % _pending_target_entry.ability.ability_name)
 	_pending_target_entry = null
-	_event_bus.stack_updated.emit(_get_stack_snapshot())
-	# Не продолжаем
+	_event_bus.stack_updated.emit(get_stack_snapshot())
 
 func clear_stack() -> void:
-	_stacks[0].clear()
-	_stacks[1].clear()
+	_stack.clear()
 	_pending_target_entry = null
-	_event_bus.stack_updated.emit(_get_stack_snapshot())
+	_event_bus.stack_updated.emit(get_stack_snapshot())
 
 func is_stack_empty() -> bool:
-	return _stacks[0].is_empty() and _stacks[1].is_empty() and _pending_target_entry == null
+	return _stack.is_empty() and _pending_target_entry == null
 
 # --- Методы для восстановления из словарей ---
 func _find_ability_by_id(id: int) -> Ability:
@@ -187,8 +237,7 @@ func _find_object_by_id(instance_id: int) -> Object:
 	return obj if is_instance_valid(obj) else null
 
 func set_stack_order(ordered_entries_data: Array) -> void:
-	_stacks[0].clear()
-	_stacks[1].clear()
+	_stack.clear()
 	for data in ordered_entries_data:
 		var ability = _find_ability_by_id(data["ability_id"])
 		var source = _find_gear_by_id(data["source_gear_id"])
@@ -198,6 +247,6 @@ func set_stack_order(ordered_entries_data: Array) -> void:
 			push_error("StackManager: could not restore entry")
 			continue
 		var entry = StackEntry.new(ability, source, target, context)
-		entry.id = data["id"]  # восстанавливаем id
-		_stacks[entry.source.owner_id].append(entry)
-	_event_bus.stack_updated.emit(_get_stack_snapshot())
+		entry.id = data["id"]
+		_stack.append(entry)
+	_event_bus.stack_updated.emit(get_stack_snapshot())
