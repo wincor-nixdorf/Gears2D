@@ -1,4 +1,4 @@
-# game_ui_manager.gd
+# game_ui_manager.gd (с добавленным логированием в _request_update)
 class_name GameUIManager
 extends RefCounted
 
@@ -31,6 +31,7 @@ func _subscribe_to_events() -> void:
 	EventBus.gear_resolved.connect(_request_update)
 
 func _request_update(_arg1 = null, _arg2 = null, _arg3 = null, _arg4 = null) -> void:
+	GameLogger.debug("GameUIManager: phase_changed received, phase = %s" % game_state.current_phase)  # добавлено
 	if _update_pending:
 		return
 	_update_pending = true

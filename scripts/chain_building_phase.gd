@@ -5,11 +5,15 @@ extends Phase
 var _selected_creature: Gear = null
 
 func enter() -> void:
+	GameLogger.debug("ChainBuildingPhase: enter - start")  # добавлено
 	GameLogger.debug("ChainBuildingPhase: enter")
 	ui.cancel_target_selection()
 	ui.clear_selection()
 	_clear_selected_creature()
+	var available = game_manager.get_available_cells()  # добавлено
+	GameLogger.debug("ChainBuildingPhase: available cells count = %d" % available.size())  # добавлено
 	game_manager.update_ui()
+	GameLogger.debug("ChainBuildingPhase: enter - end")  # добавлено
 
 func exit() -> void:
 	_clear_selected_creature()

@@ -16,6 +16,7 @@ func _init(gm: GameManager, gs: GameState) -> void:
 	ui = gm.ui
 
 func start_round() -> void:
+	GameLogger.debug("RoundManager: start_round called (will call change_phase to CHAIN_BUILDING)")
 	game_manager.set_active_cell(Vector2i(-1, -1))
 	game_manager.clear_used_abilities()
 	game_state.start_player_id = game_state.active_player_id
@@ -29,7 +30,6 @@ func start_round() -> void:
 	game_state.selected_gear = null
 	ui.clear_selection()
 	phase_machine.change_phase(Game.GamePhase.CHAIN_BUILDING)
-	# game_manager.update_ui() не нужен, phase_changed обновит
 
 func end_chain_resolution() -> void:
 	game_manager.set_active_cell(Vector2i(-1, -1))
@@ -61,6 +61,10 @@ func end_chain_resolution() -> void:
 	for p in game_manager.players:
 		p.draw_card()
 	
+	# Планируем начало нового раунда после завершения текущих операций
+	call_deferred("_start_next_round")
+
+func _start_next_round() -> void:
 	game_state.active_player_id = 1 - game_state.start_player_id
 	game_state.round_number += 1
 	EventBus.player_changed.emit(game_state.active_player_id)

@@ -136,14 +136,17 @@ func restart_chain_resolution() -> void:
 		GameLogger.error("restart_chain_resolution called but current phase is not ResolutionPhase")
 
 func end_chain_building() -> void:
+	GameLogger.debug("GameManager: end_chain_building called (will call change_phase to UPTURN)")  # добавлено
 	phase_machine.change_phase(Game.GamePhase.UPTURN)
 	GameLogger.info("Chain building phase ended. Starting upturn phase.")
 
 func end_upturn() -> void:
+	GameLogger.debug("GameManager: end_upturn called from %s (will call change_phase to RESOLUTION)" % str(get_stack()))  # добавлено
 	phase_machine.change_phase(Game.GamePhase.CHAIN_RESOLUTION)
 	GameLogger.info("Upturn phase ended. Starting chain resolution.")
 
 func end_chain_resolution() -> void:
+	GameLogger.debug("GameManager: end_chain_resolution called (will call round_manager.end_chain_resolution)")  # добавлено
 	round_manager.end_chain_resolution()
 
 func end_game(winner_id: int) -> void:

@@ -6,6 +6,10 @@ func enter() -> void:
 	GameLogger.debug("RenewalPhase: enter")
 	game_manager.update_ui()
 
+func exit() -> void:
+	GameLogger.debug("RenewalPhase: exit")  # добавлено
+	super()
+
 # В фазе обновления клики по шестерням обычно не обрабатываются,
 # но для соответствия сигнатуре оставляем заглушку
 func handle_gear_clicked(gear: Gear, button_index: int) -> void:

@@ -5,7 +5,7 @@ func _init() -> void:
 	ability_id = GameEnums.AbilityID.SPARK
 	ability_name = "Spark"
 	target_type = GameEnums.TargetType.ANY
-	description = "Deal 1 damage to any target: player, face-down gear (tock), or creature (damage)."
+	description = "Deal 1 damage to any target."
 
 func execute(context: Dictionary) -> void:
 	var source = context.get("source_gear") as Gear

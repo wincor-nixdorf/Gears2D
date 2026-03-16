@@ -55,6 +55,7 @@ func resolve_current_gear() -> void:
 	game_manager.update_ui()
 
 func _on_stack_resolved() -> void:
+	GameLogger.debug("ResolutionPhase: _on_stack_resolved")  # добавлено
 	if game_state.current_phase != Game.GamePhase.CHAIN_RESOLUTION:
 		return
 	if game_state.current_resolve_pos == Vector2i(-1, -1):
@@ -62,6 +63,7 @@ func _on_stack_resolved() -> void:
 	var gear = board_manager.get_gear_at(game_state.current_resolve_pos)
 	if not gear:
 		# шестерня уничтожена – переходим к следующей клетке
+		GameLogger.debug("ResolutionPhase: gear destroyed, calling proceed_to_next_cell")  # добавлено
 		proceed_to_next_cell()
 		return
 	# Возвращаем возможность действовать на текущей клетке
@@ -90,9 +92,11 @@ func get_next_cell() -> Vector2i:
 	return next_pos
 
 func proceed_to_next_cell() -> void:
+	GameLogger.debug("ResolutionPhase: proceed_to_next_called")  # добавлено
 	game_state.waiting_for_player = false
 	var next_pos = get_next_cell()
 	if next_pos == Vector2i(-1, -1):
+		GameLogger.debug("ResolutionPhase: no next cell, calling game_manager.end_chain_resolution()")  # добавлено
 		game_manager.end_chain_resolution()
 		game_manager.ui.cancel_target_selection()
 	else:

@@ -11,11 +11,14 @@ func _init(gm: GameManager, gs: GameState, bm: BoardManager):
 	game_state = gs
 	board_manager = bm
 
+# Проверка, можно ли начать цепочку с данной клетки
 func is_valid_start_position(pos: Vector2i) -> bool:
-	if game_state.round_number == 1:
+	# Если на доске нет шестерен, разрешены только стартовые позиции для текущего игрока
+	if board_manager.get_all_gears().is_empty():
 		var start_positions = get_start_positions_for_player(game_state.active_player_id)
 		return pos in start_positions
 	
+	# Если есть вражеские шестерни, можно начинать только с соседних с ними клеток
 	var has_enemy_gear = false
 	for gear in board_manager.get_all_gears():
 		if gear.owner_id != game_state.active_player_id:
@@ -23,11 +26,13 @@ func is_valid_start_position(pos: Vector2i) -> bool:
 			break
 	
 	if not has_enemy_gear:
+		# Нет вражеских шестерен – можно ставить на любую пустую клетку своего цвета
 		var is_white = board_manager.is_white(pos)
 		var color_ok = (game_state.active_player_id == 0 and is_white) or (game_state.active_player_id == 1 and not is_white)
 		var empty = board_manager.is_cell_empty(pos)
 		return color_ok and empty
 	
+	# Проверяем соседство с вражескими шестернями
 	for gear in board_manager.get_all_gears():
 		if gear.owner_id != game_state.active_player_id:
 			var enemy_pos = gear.board_position
@@ -38,22 +43,41 @@ func is_valid_start_position(pos: Vector2i) -> bool:
 				return color_ok and empty
 	return false
 
+# Проверка ортогональной смежности
 func is_adjacent(pos1: Vector2i, pos2: Vector2i) -> bool:
 	return abs(pos1.x - pos2.x) + abs(pos1.y - pos2.y) == 1
 
+# Проверка возможности паса (всегда true в фазе построения цепочки)
 func can_pass() -> bool:
-	return not game_state.has_placed_this_turn and game_state.moves_in_round >= 2
+	return game_state.current_phase == Game.GamePhase.CHAIN_BUILDING
 
+# Возвращает список клеток, доступных для хода в текущий момент
 func get_available_cells() -> Array[Cell]:
 	var result: Array[Cell] = []
+	GameLogger.debug("get_available_cells: last_cell_pos = %s, phase = %s" % [game_state.last_cell_pos, game_state.current_phase])
+	
+	# Если цепочка ещё не начата (last_cell_pos == -1)
 	if game_state.last_cell_pos == Vector2i(-1, -1):
-		if game_state.round_number == 1:
+		# Проверяем, есть ли хоть одна шестерня на доске
+		var any_gear_on_board = not board_manager.get_all_gears().is_empty()
+		GameLogger.debug("get_available_cells: any_gear_on_board = %s, active_player = %d" % [any_gear_on_board, game_state.active_player_id])
+		
+		if not any_gear_on_board:
+			# Доска пуста – только стартовые позиции для текущего игрока
 			var start_positions = get_start_positions_for_player(game_state.active_player_id)
+			GameLogger.debug("get_available_cells: board empty, start positions: %s" % str(start_positions))
 			for pos in start_positions:
 				var cell = board_manager.get_cell(pos)
-				if cell and cell.is_empty():
-					result.append(cell)
+				if cell:
+					GameLogger.debug("Cell %s exists, is_empty = %s" % [pos, cell.is_empty()])
+					if cell.is_empty():
+						result.append(cell)
+				else:
+					GameLogger.debug("Cell %s is null!" % pos)
+			GameLogger.debug("get_available_cells: returning %d cells" % result.size())
+			return result
 		else:
+			# На доске есть шестерни, но цепочка не начата
 			var has_enemy_gear = false
 			for gear in board_manager.get_all_gears():
 				if gear.owner_id != game_state.active_player_id:
@@ -72,29 +96,37 @@ func get_available_cells() -> Array[Cell]:
 										candidates.append(cell)
 				result = candidates
 			else:
+				# Вражеских шестерен нет – можно ставить на любую пустую клетку своего цвета
 				for cell in board_manager.get_all_cells():
 					if cell.is_empty():
 						if (game_state.active_player_id == 0 and cell.is_white()) or (game_state.active_player_id == 1 and cell.is_black()):
 							result.append(cell)
-		return result
+			GameLogger.debug("get_available_cells: returning %d cells (board has gears)" % result.size())
+			return result
 	
+	# Цепочка уже начата – доступны соседние клетки, удовлетворяющие правилам
 	var neighbors = board_manager.get_neighbors(game_state.last_cell_pos)
 	for n in neighbors:
 		var cell = board_manager.get_cell(n)
 		if not cell:
 			continue
+		# Проверка цвета клетки
 		var color_ok = (game_state.active_player_id == 0 and cell.is_white()) or (game_state.active_player_id == 1 and cell.is_black())
 		if not color_ok:
 			continue
+		# Пустая клетка – подходит
 		if cell.is_empty():
 			result.append(cell)
 			continue
+		# Занятая клетка – можно использовать только свою шестерню, если ещё нет прямого ребра
 		if cell.occupied_gear.is_owned_by(game_state.active_player_id):
 			var has_direct_edge = game_state.chain_graph.has_edge(game_state.last_cell_pos, n)
 			if not has_direct_edge:
 				result.append(cell)
+	GameLogger.debug("get_available_cells: returning %d cells (chain in progress)" % result.size())
 	return result
 
+# Возвращает стартовые позиции для заданного игрока (для первого хода в раунде)
 func get_start_positions_for_player(player: int) -> Array[Vector2i]:
 	return board_manager.get_start_positions_for_player(player)
 

@@ -1,4 +1,4 @@
-# ability_dispatcher.gd
+# ability_dispatcher.gd (временно отключены триггерные способности на смену фазы)
 class_name AbilityDispatcher
 extends RefCounted
 
@@ -23,7 +23,6 @@ func _connect_signals():
 	event_bus.target_selection_cancelled.connect(_on_target_selection_cancelled)
 	event_bus.gear_resolved.connect(_on_gear_resolved)
 
-# --- Обработчики для событий ---
 func _on_gear_placed(gear: Gear, cell: Cell):
 	_trigger_abilities_on_gear(gear, GameEnums.TriggerCondition.ON_PLACED, {"source_gear": gear, "cell": cell})
 	
@@ -42,16 +41,15 @@ func _on_gear_rotated(gear: Gear, old_ticks: int, new_ticks: int):
 	_trigger_abilities_on_gear(gear, GameEnums.TriggerCondition.ON_TICK if direction == "tick" else GameEnums.TriggerCondition.ON_TOCK, context)
 
 func _on_phase_changed(old_phase: Game.GamePhase, new_phase: Game.GamePhase):
+	GameLogger.debug("AbilityDispatcher: phase changed from %s to %s" % [old_phase, new_phase])
 	var context = {"old_phase": old_phase, "new_phase": new_phase}
 	if new_phase != old_phase:
 		_trigger_abilities_global(GameEnums.TriggerCondition.ON_PHASE_START, context)
 		_trigger_abilities_global(GameEnums.TriggerCondition.ON_PHASE_END, {"phase": old_phase})
 
 func _on_gear_resolved(gear: Gear, was_face_up: bool):
-	# Триггерные способности теперь добавляются в стек непосредственно в gear.gd
 	pass
 
-# --- Обработка выбора цели (для триггерных способностей, которые требуют цели) ---
 func _on_target_selected(target: Object):
 	if target_selector.is_waiting:
 		await target_selector.select_target(target)
@@ -64,7 +62,6 @@ func _on_target_selection_cancelled():
 	else:
 		GameLogger.debug("Target selection cancelled but no waiting selector")
 
-# --- Методы для обработки триггерных способностей по событиям ---
 func _trigger_abilities_on_gear(gear: Gear, trigger_condition: int, base_context: Dictionary):
 	for slot in gear.ability_slots:
 		if slot.type == GameEnums.AbilityType.TRIGGERED and slot.trigger == trigger_condition:
@@ -77,10 +74,7 @@ func _trigger_abilities_global(trigger_condition: int, base_context: Dictionary)
 				_handle_triggered_ability(slot.ability, gear, base_context)
 
 func _handle_triggered_ability(ability: Ability, source: Gear, base_context: Dictionary):
-	# Для триггерных способностей, сработавших по событию, добавляем их в стек
-	# Если способность требует цель, она будет запрошена при разрешении
 	if ability.target_type != GameEnums.TargetType.NO_TARGET:
-		# В контексте может не быть цели, поэтому пока target = null
 		game_manager.stack_manager.push_effect(ability, source, null, base_context)
 	else:
 		game_manager.stack_manager.push_effect(ability, source, null, base_context)
