@@ -2,7 +2,7 @@
 	{
 		"name": "Boomerang",
 		"supertype": "",
-		"type": "Routine",
+		"type": "Tuning",
 		"subtype": "",
 		"speed": 0,
 		"is_flying": false,
@@ -32,7 +32,7 @@
 	{
 		"name": "Repeat",
 		"supertype": "",
-		"type": "Routine",
+		"type": "Tuning",
 		"subtype": "",
 		"speed": 0,
 		"is_flying": false,
@@ -45,18 +45,19 @@
 		]
 	},
 	{
-		"name": "Mana Leak",
-		"supertype": "",
-		"type": "Routine",
-		"subtype": "",
-		"speed": 0,
-		"is_flying": false,
-		"texture_reverse": "res://assets/gears/reverse2.png",
-		"texture_obverse": "res://assets/gears/mana_leak.png",
-		"max_ticks": 2,
-		"max_tocks": 2,
-		"ability_slots": [
-			{"ability_id": 3, "type": 0, "cost": 0, "trigger": 0}
+	"name": "Mana Leak",
+	"supertype": "",
+	"type": "Interrupt",
+	"subtype": "",
+	"speed": 0,
+	"is_flying": false,
+	"texture_reverse": "res://assets/gears/reverse2.png",
+	"texture_obverse": "res://assets/gears/mana_leak.png",
+	"max_ticks": 2,
+	"max_tocks": 2,
+	"ability_slots": [
+		{"ability_id": 9, "type": 1, "cost": 1, "trigger": -1},
+		{"ability_id": 3, "type": 0, "cost": 0, "trigger": 0}
 		]
 	},
 	{
@@ -111,12 +112,15 @@
 		"subtype": "Gearling",
 		"speed": 3,
 		"is_flying": false,
+		"impact": 1,
+		"resistance": 1,
 		"texture_reverse": "res://assets/gears/reverse2.png",
 		"texture_obverse": "res://assets/gears/sparkling.png",
 		"max_ticks": 2,
 		"max_tocks": 1,
 		"ability_slots": [
-			{"ability_id": 4, "type": 0, "cost": 0, "trigger": 0}
+			{"ability_id": 4, "type": 0, "cost": 0, "trigger": 0},
+			{"ability_id": 8, "type": 0, "cost": 0, "trigger": 0}
 		]
 	},
 	{
@@ -126,11 +130,15 @@
 		"subtype": "Gangster",
 		"speed": 4,
 		"is_flying": true,
+		"impact": 2,
+		"resistance": 2,
 		"texture_reverse": "res://assets/gears/reverse2.png",
 		"texture_obverse": "res://assets/gears/air_gangsters.png",
 		"max_ticks": 3,
 		"max_tocks": 3,
-		"ability_slots": []
+		"ability_slots": [
+			{"ability_id": 8, "type": 0, "cost": 0, "trigger": 0}
+		]
 	},
 	{
 		"name": "Cauterizer",
@@ -139,12 +147,15 @@
 		"subtype": "Gutterborn",
 		"speed": 5,
 		"is_flying": false,
+		"impact": 3,
+		"resistance": 1,
 		"texture_reverse": "res://assets/gears/reverse2.png",
 		"texture_obverse": "res://assets/gears/cauterizer.png",
 		"max_ticks": 3,
 		"max_tocks": 2,
 		"ability_slots": [
-			{"ability_id": 4, "type": 1, "cost": 2, "trigger": -1}
+			{"ability_id": 4, "type": 1, "cost": 2, "trigger": -1},
+			{"ability_id": 8, "type": 0, "cost": 0, "trigger": 0}
 		]
 	}
 ]

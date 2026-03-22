@@ -13,3 +13,5 @@ extends Resource
 @export var max_ticks: int = 3
 @export var max_tocks: int = 2
 @export var ability_slots: Array[AbilitySlotData] = []
+@export var impact: int = 0      # новая характеристика (сила атаки)
+@export var resistance: int = 0  # новая характеристика (защита)

@@ -1,131 +1,233 @@
-Памятка по асинхронности в Godot 4 (GDScript)
+Памятка по разработке игры Gears (Godot 4)
+1. Асинхронность и ожидание сигналов
+1.1. Основные правила
+В GDScript нет ключевого слова async. Функция становится асинхронной автоматически при наличии await внутри.
 
-Объявление асинхронной функции: не используй ключевое слово async. Любая функция, внутри которой есть хотя бы один await, автоматически становится асинхронной.
-Пример:
+При вызове асинхронной функции всегда используй await, иначе выполнение продолжится без ожидания.
 
+После await всегда проверяй существование объекта: if not is_instance_valid(obj): return
+
+1.2. Ожидание выбора цели
 gdscript
-func do_something():
-    await get_tree().create_timer(1.0).timeout
-    print("Done")
-Вызов асинхронной функции: чтобы дождаться завершения, используй await перед вызовом:
-
+func _wait_for_target_selection_complete() -> void:
+    while game_manager.ui.is_target_selection_active():
+        await _wait_for_next_frame()
+1.3. Ожидание следующего кадра
 gdscript
-await do_something()
-Если await не поставить, функция запустится, но продолжение кода не будет ждать её окончания (выполнение продолжится сразу). Это может привести к состояниям гонки, если нужен результат.
+func _wait_for_next_frame() -> void:
+    await game_manager.get_tree().process_frame
+2. Interrupt механика
+2.1. Последовательность действий при Interrupt
+В фазе Resolution, когда в стеке есть способность, открывается окно Interrupt для неактивного игрока
 
-Возврат значений: асинхронная функция может возвращать значение (например, func get_data() -> int:), и тогда после await можно получить результат. Но если функция не возвращает явно (возвращает void), после await получишь null.
+Игрок выбирает Interrupt из руки, затем кликает на клетку (ортогонально смежную с разрешаемой)
 
-Использование await с сигналами: await работает с любым сигналом:
+Interrupt размещается на доске как AG (Active Gear) и становится последним звеном цепочки
 
+Стек очищается
+
+Разрешение цепочки перезапускается с Interrupt
+
+2.2. Ключевые методы
+_run_interrupt_window_before_resolve() — открывает окно для Interrupt
+
+_play_interrupt() — размещает Interrupt на доске
+
+set_interrupt_played() — устанавливает состояние Interrupt
+
+restart_with_interrupt() — перезапускает разрешение с Interrupt
+
+2.3. Проверка возможности Interrupt
 gdscript
-await some_object.some_signal
-Обработчики сигналов: если в обработчике сигнала нужно выполнить асинхронный код (например, вызвать await), просто используй await внутри обработчика. Сигнал не ждёт завершения обработчика, поэтому будь внимателен при последовательных асинхронных операциях — они могут выполняться параллельно. При необходимости используй флаги или блокировки.
-
-Где нельзя использовать await: в функциях, которые должны выполняться синхронно (например, _ready(), _process()), await технически допустим, но может привести к неожиданностям, так как основной цикл продолжит выполняться. Лучше запускать асинхронные задачи через call_deferred() или использовать корутины.
-
-Наследование: при переопределении асинхронного метода (например, func execute(context) -> void: в классе Ability) в наследнике не пиши async, но внутри можешь использовать await. Контракт метода (сигнатура) остаётся тем же.
-
-Ошибка "Unexpected identifier 'async'": возникает, если написать async func в GDScript. Этого ключевого слова в языке нет, просто не используй его.
-
-Краткий пример:
-
+func _can_play_interrupt(gear: Gear, target_cell: Cell) -> bool:
+    # Проверка: тип Interrupt, в руке, достаточно T, клетка пуста,
+    # ортогональна, правильного цвета, не своя шестерня
+3. Стек способностей (StackManager)
+3.1. Структура StackEntry
 gdscript
-# Правильно
-func load_data():
-    print("Loading...")
-    await get_tree().create_timer(2.0).timeout
-    print("Loaded")
-    return 42
+class StackEntry:
+    var ability: Ability
+    var source: Gear
+    var target: Object
+    var context: Dictionary
+    var id: int
+    var source_pos: Vector2i
+3.2. Пакетная обработка (batch)
+begin_batch(active_player_id) — начало пакета
 
-# Вызов с ожиданием результата
-var result = await load_data()
-print(result)  # 42
+push_effect_with_target() — добавление способности с запросом цели
 
-# Памятка по разработке игры в Godot 4 (GDScript)
+end_batch() — завершение пакета, запрос порядка от UI
 
-## 1. Асинхронность
-- Не пиши `async` перед функцией – достаточно использовать `await` внутри.
-- Обработчики сигналов не могут быть `async`, но внутри них можно вызывать `await` (сигнал не ждёт завершения, но это допустимо).
-- При вызове асинхронной функции всегда используй `await`, иначе она выполнится без ожидания.
+3.3. Проверка легальности цели
+При добавлении в стек: запрос цели через UI
 
-## 2. Инициализация узлов (@onready)
-- Переменные с `@onready` инициализируются **после** добавления узла в дерево.
-- Если создаёшь экземпляр сцены через `instantiate()`, сначала добавь его в дерево (`add_child`), затем вызывай `setup()`. Иначе `@onready` переменные будут `null`.
+При разрешении: повторная проверка существования и легальности цели
 
-## 3. Поиск элементов в стеке
-- Для манипуляций со стеком (перемещение элементов) используй уникальный идентификатор (`id`) в каждом элементе.
-- Не полагайся на сравнение словарей через `find` – они могут не совпадать. Лучше хранить `id` и искать по нему.
+3.4. Метод has_pending_target()
+gdscript
+func has_pending_target() -> bool:
+    return _pending_target_entry != null
+4. Фаза разрешения цепочки (ResolutionPhase)
+4.1. Структура шагов
+BEFORE — до разрешения (приоритет)
 
-## 4. Разрешение стека
-- **Пошаговое разрешение:** каждая способность выполняется только после нажатия кнопки «Разрешить» (или автоматически после выбора цели). Это даёт игроку контроль над порядком.
-- После выполнения Upheaval (или другой способности, добавляющей новые эффекты) стек обновляется, но разрешение **не продолжается автоматически** – игрок должен снова нажать кнопку.
-- При запросе цели разрешение приостанавливается; после выбора цели способность выполняется, и стек останавливается (ждёт следующего нажатия).
+RESOLVE — авто-тик, флип, триггеры, обработка стека
 
-## 5. Выбор цели
-- Цель должна запрашиваться **в момент разрешения способности**, а не при добавлении в стек. Это соответствует MTG.
-- Во время выбора цели блокируй кнопку «Разрешить» и другие элементы управления стеком, чтобы избежать конфликтов.
+AFTER — после разрешения (приоритет)
 
-## 6. Дублирование вызовов способностей
-- Не испускай дважды один и тот же сигнал (например, `triggered` и `EventBus.gear_triggered`). В `gear.gd` в `trigger()` оставь только `triggered.emit(self)`.
-- Все триггерные способности должны добавляться в стек через `StackManager`, а не выполняться немедленно.
+4.2. Обработка стека и Interrupt
+gdscript
+func _handle_stack_and_interrupts() -> void:
+    while not stack_empty:
+        # Ждём выбора цели если нужно
+        if stack_manager.has_pending_target():
+            await _wait_for_target_selection()
+            continue
+        
+        # Открываем окно Interrupt
+        await _run_interrupt_window_before_resolve()
+        
+        if interrupt_played:
+            # Добавляем Interrupt в начало очереди
+            _resolve_queue.insert(0, _interrupt_pos)
+            _current_index = 0
+            return  # Выход для перезапуска
+        
+        # Разрешаем следующий элемент стека
+        stack_manager.resolve_next()
+        await _wait_for_stack_or_interrupt()
+4.3. Перезапуск разрешения после Interrupt
+gdscript
+if _interrupt_state == InterruptState.INTERRUPT_PLAYED:
+    _interrupt_state = InterruptState.NONE
+    _current_index = 0
+    _resolve_next()
+    return
+5. Выбор цели для способностей
+5.1. Механика выбора
+Способность с target_type != NO_TARGET запрашивает цель через push_effect_with_target()
 
-## 7. Анимации (Tween)
-- Перед созданием нового `Tween` убивай старый, если он ещё активен, чтобы избежать блокировки:
-  ```gdscript
-  if _current_tween and _current_tween.is_valid():
-      _current_tween.kill()
-После kill можно создавать новый и ожидать его завершения.
+UI подсвечивает возможные цели
 
-8. Структура проекта
-Разделяй ответственность: GameManager не должен содержать всю логику. Используй компоненты:
+После выбора цель сохраняется в StackEntry
 
-GameInitializer – загрузка данных, создание игроков.
+При разрешении проверяется легальность цели
 
-GameRuleValidator – проверки правил.
+5.2. Пример для Spark
+gdscript
+func get_possible_targets(context: Dictionary) -> Array:
+    var result = []
+    # Добавляем игроков
+    for player in game_manager.get_players():
+        result.append(player)
+    # Добавляем шестерни
+    for gear in board_manager.get_all_gears():
+        if gear == source: continue
+        if gear.type == GameEnums.GearType.INTERRUPT: continue
+        if not gear.is_face_up:
+            result.append(gear)  # DG
+        elif gear.type == GameEnums.GearType.CREATURE:
+            result.append(gear)  # Существо
+    return result
+6. Эффекты и модификаторы (EffectSystem)
+6.1. Структура ModifierEntry
+gdscript
+class ModifierEntry:
+    var source: Object
+    var tag: String
+    var data: Dictionary
+6.2. Метод has_prevent_trigger (одноразовый)
+gdscript
+func has_prevent_trigger(target: Object) -> bool:
+    if not _modifiers.has(target): return false
+    for i in range(_modifiers[target].size() - 1, -1, -1):
+        if _modifiers[target][i].tag == "prevent_trigger":
+            _modifiers[target].remove_at(i)
+            if _modifiers[target].is_empty():
+                _modifiers.erase(target)
+            return true
+    return false
+7. Цепочка (ChainGraph)
+7.1. Структура
+Граф, где вершины — позиции клеток (Vector2i)
 
-GameEventHandler – обработка сигналов от объектов.
+Рёбра только ортогональные
 
-GameUIManager – обновление UI через события.
+LIFO при разрешении: _resolve_queue = chain_order.duplicate().reverse()
 
-StackManager – управление стеком способностей.
+7.2. Добавление Interrupt в цепочку
+gdscript
+_resolve_queue.insert(0, _interrupt_pos)
+_current_index = 0
+game_state.current_resolve_pos = _interrupt_pos
+_current_gear = board_manager.get_gear_at(_interrupt_pos)
+8. Визуальное выделение
+8.1. Активная клетка
+Яркая оранжевая рамка
 
-9. Отвязка UI от логики
-UI не должен знать о GameManager. Вместо этого:
+Пульсирующая подсветка
 
-В GameUIManager подпишись на события EventBus и обновляй UI методами.
+Анимация с изменением прозрачности
 
-В способностях и командах не вызывай update_ui() напрямую – изменения произойдут по событиям.
+8.2. Линии цепочки
+Толщина 3px
 
-10. Типичные ошибки
-Забыл добавить узел в дерево перед вызовом setup → @onready переменные null.
+Разные цвета для разных рёбер
 
-Использовал find по словарю вместо сравнения по id.
+Эффект свечения
 
-Не убил старый Tween → анимация не запускается.
+9. Типичные ошибки и их решения
+9.1. После Interrupt не продолжается разрешение
+Причина: неправильный выход из _handle_stack_and_interrupts()
 
-Двойная эмиссия сигнала → способность выполняется дважды.
+Решение: после Interrupt выходим из метода, но не вызываем _resolve_next() — разрешение продолжится через _start_resolve()
 
-Автоматическое разрешение стека после добавления новых эффектов (например, после Upheaval) → игрок не успевает изменить порядок.
+9.2. Не отображается окно стека для способности Interrupt
+Причина: не проверяется has_pending_target() перед открытием окна Interrupt
 
-11. Порядок добавления в стек
-Используй push_front, чтобы последний добавленный был первым в очереди (LIFO).
+Решение: добавить проверку в _handle_stack_and_interrupts()
 
-При отображении в UI показывай элементы в том порядке, в котором они будут выполняться (первый сверху – следующий на выполнение).
+9.3. Spark может выбрать Interrupt как цель
+Причина: Interrupt не исключается из get_possible_targets()
 
-12. Валидация целей
-При запросе цели проверяй, что цель всё ещё существует и легальна (в момент разрешения). Если цель исчезла, способность должна провалиться (как в MTG).
+Решение: проверять gear.type == GameEnums.GearType.INTERRUPT и пропускать
 
-13. Рефакторинг
-Постепенно убирай прямые зависимости от GameManager в способностях и командах. Внедряй через интерфейсы или передавай только необходимые компоненты.
+9.4. Модификатор prevent_trigger не срабатывает
+Причина: проверка has_modifier() не удаляет модификатор
 
-14. Полезные сигналы в EventBus
-stack_updated – для обновления UI стека.
+Решение: использовать has_prevent_trigger() который потребляет модификатор
 
-stack_resolved – для оповещения, что стек опустел (используется в ResolutionPhase для перехода к следующей G).
+10. Структура фазы Resolution
+text
+_resolve_next() → _start_before_resolve() → _run_priority_cycle("Before")
+→ _start_resolve() → auto-tick → flip → push_triggered_abilities_to_stack()
+→ _wait_for_target_selection_complete() → _handle_stack_and_interrupts()
+→ _start_after_resolve() → _run_priority_cycle("After") → proceed_to_next_cell()
+11. Ключевые сигналы EventBus
+Сигнал	Назначение
+stack_updated	Обновление UI стека
+stack_resolved	Стек опустел
+target_selection_requested	Запрос выбора цели
+target_selected	Цель выбрана
+target_selection_cancelled	Выбор цели отменён
+gear_resolved	Шестерня разрешена
+phase_changed	Смена фазы
+12. Полезные методы
+12.1. Проверка существования цели
+gdscript
+if entry.target and not is_instance_valid(entry.target):
+    # Цель уничтожена, способность сгорает
+    return
+12.2. Проверка легальности цели
+gdscript
+var possible_targets = entry.ability.get_possible_targets({"source_gear": entry.source})
+if entry.target not in possible_targets:
+    # Цель больше не легальна
+    return
+12.3. Проверка, находится ли шестерня в цепочке
+gdscript
+if game_state.chain_graph.has_vertex(gear.board_position):
+    # Шестерня уже в цепочке
 
-target_selection_started – для блокировки кнопок во время выбора цели.
 
-15. Отладка
-Включай логирование ключевых моментов (добавление в стек, разрешение, выбор цели) – это помогает быстро находить ошибки.
-
-При проблемах с отображением проверяй, не перекрывают ли элементы друг друга (используй mouse_filter, z_index, временные цвета фона).

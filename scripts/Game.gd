@@ -1,3 +1,4 @@
+# Game.gd
 extends Node
 
 # Константы игры
@@ -7,13 +8,26 @@ const BOARD_SIZE = 8
 const MAX_DAMAGE = 24
 const START_HAND_SIZE = 6
 const DECK_SIZE = 32
+const MAX_HAND_SIZE = 6
 
-# Перечисление фаз игры
+# Перечисление фаз игры (в хронологическом порядке)
 enum GamePhase {
-	CHAIN_BUILDING,
-	UPTURN,
-	CHAIN_RESOLUTION,
-	RENEWAL
+	# Beginning Phase (Начальная фаза)
+	UPKEEP,             # 0 - Шаг обслуживания
+	DRAW,               # 1 - Шаг взятия карты
+	
+	# Main Phase (Основная фаза)
+	CHAIN_BUILDING,     # 2 - Фаза построения цепочки
+	
+	# Pre-resolution Phase (Фаза перед разрешением)
+	SWING_BACK,         # 3 - Фаза замаха
+	
+	# Resolution Phase (Фаза разрешения)
+	CHAIN_RESOLUTION,   # 4 - Фаза разрешения цепочки
+	
+	# Ending Phase (Финальная фаза)
+	END,                # 5 - Шаг конца хода
+	CLEANUP             # 6 - Шаг очистки
 }
 
 # Вспомогательные функции

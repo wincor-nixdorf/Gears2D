@@ -50,9 +50,12 @@ func _on_phase_changed(old_phase: Game.GamePhase, new_phase: Game.GamePhase):
 func _on_gear_resolved(gear: Gear, was_face_up: bool):
 	pass
 
-func _on_target_selected(target: Object):
+func _on_target_selected(target: Object) -> void:
+	GameLogger.debug("AbilityDispatcher: target selected: %s" % target)
 	if target_selector.is_waiting:
-		await target_selector.select_target(target)
+		# Вызываем select_target, который сам отправит сигнал target_selected
+		# и выполнит способность
+		target_selector.select_target(target)
 	else:
 		GameLogger.debug("Target selected but no waiting selector")
 

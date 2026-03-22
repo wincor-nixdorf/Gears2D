@@ -34,6 +34,8 @@ var type: GameEnums.GearType = GameEnums.GearType.ROUTINE
 var subtype: GameEnums.GearSubtype = GameEnums.GearSubtype.NONE
 var speed: int = 0
 var is_flying: bool = false
+var impact: int = 0
+var resistance_base: int = 0          # базовое сопротивление (только для существ)
 var owner_id: int = 0
 var max_ticks: int = 3
 var max_tocks: int = 2
@@ -45,7 +47,8 @@ var is_face_up: bool = false
 var current_ticks: int = 0
 var board_position: Vector2i = Vector2i(-1, -1)
 var ability_slots: Array[AbilitySlot] = []
-var damage_taken: int = 0
+var damage_taken: int = 0              # накопленный урон (только для существ)
+var revealed: bool = false              # видна ли информация противнику
 
 var game_manager: GameManager
 
@@ -71,11 +74,14 @@ func apply_data(data: GearData) -> void:
 	subtype = data.subtype
 	speed = data.speed
 	is_flying = data.is_flying
+	impact = data.impact
+	resistance_base = data.resistance
 	max_ticks = data.max_ticks
 	max_tocks = data.max_tocks
 	texture_reverse = data.texture_reverse
 	texture_obverse = data.texture_obverse
 	damage_taken = 0
+	revealed = false
 	
 	ability_slots.clear()
 	for slot_data in data.ability_slots:
@@ -127,6 +133,12 @@ func _animate_rotation(target_ticks: int) -> void:
 		.set_trans(Tween.TRANS_LINEAR)
 	await _current_tween.finished
 
+func get_interrupt_cost() -> int:
+	for slot in ability_slots:
+		if slot.type == GameEnums.AbilityType.ACTIVATED:
+			return slot.cost
+	return 1  # стоимость по умолчанию
+	
 func do_tick(ticks: int = 1) -> bool:
 	if is_face_up:
 		return false
@@ -155,50 +167,109 @@ func do_tock(ticks: int = 1) -> bool:
 	rotated.emit(self, old_ticks, current_ticks)
 	return true
 
+# Общий метод для добавления всех триггерных способностей в стек (с учётом batch)
+func push_triggered_abilities_to_stack() -> void:
+	# Проверяем, не предотвращён ли триггер
+	if game_manager and game_manager.is_trigger_prevented(self):
+		GameLogger.debug("Trigger prevented by Mana Leak for %s" % gear_name)
+		return
+
+	var trigger_slots = []
+	for slot in ability_slots:
+		if slot.type == GameEnums.AbilityType.TRIGGERED and slot.trigger == GameEnums.TriggerCondition.ON_TRIGGER:
+			trigger_slots.append(slot)
+	
+	if trigger_slots.is_empty():
+		return
+	
+	GameLogger.debug("Gear %s: pushing %d triggered abilities to stack" % [gear_name, trigger_slots.size()])
+	
+	game_manager.stack_manager.begin_batch(owner_id)
+	for slot in trigger_slots:
+		var context = {"source_gear": self}
+		GameLogger.debug("Gear %s: adding ability %s to stack" % [gear_name, slot.ability.ability_name])
+		game_manager.stack_manager.push_effect_with_target(slot.ability, self, context)
+	game_manager.stack_manager.end_batch()
+
+
 func flip() -> void:
 	if is_face_up:
 		return
 	is_face_up = true
+	revealed = true   # после переворота информация становится видна
 	update_texture()
 	sprite.rotation_degrees = 0
 	_apply_static_effects()
-	if _has_trigger_abilities():
-		trigger()
+	
+	# Добавляем триггерные способности в стек (через batch)
+	push_triggered_abilities_to_stack()
+	
+	# Если это TUNING, добавляем себя в список на возврат после разрешения стека
+	if type == GameEnums.GearType.TUNING:
+		if game_manager and game_manager.game_state:
+			game_manager.game_state.tuning_to_reset.append(self)
+	
 	triggered.emit(self)
+
+# Вызывается из game_manager после опустошения стека
+func reset_tuning() -> void:
+	if not is_instance_valid(self):
+		return
+	if zone != Zone.BOARD:
+		return
+	if not is_face_up:
+		return
+	# Возвращаем в исходное положение
+	is_face_up = false
+	current_ticks = 0
+	revealed = true   # остаётся видимой
+	update_texture()
+	update_rotation()
+	GameLogger.debug("Tuning gear %s reset to face-down at %s" % [gear_name, Game.pos_to_chess(board_position)])
 
 func _apply_static_effects() -> void:
 	for slot in ability_slots:
 		if slot.type == GameEnums.AbilityType.STATIC:
 			slot.ability.execute({"source_gear": self})
 
-func _has_trigger_abilities() -> bool:
-	for slot in ability_slots:
-		if slot.type == GameEnums.AbilityType.TRIGGERED and slot.trigger == GameEnums.TriggerCondition.ON_TRIGGER:
-			return true
-	return false
-
 func trigger() -> void:
-	for slot in ability_slots:
-		if slot.type == GameEnums.AbilityType.TRIGGERED and slot.trigger == GameEnums.TriggerCondition.ON_TRIGGER:
-			var context = {"source_gear": self}
-			GameLogger.debug("Gear %s: adding ability %s to stack" % [gear_name, slot.ability.ability_name])
-			game_manager.stack_manager.push_effect(slot.ability, self, null, context)
+	# Для совместимости
+	push_triggered_abilities_to_stack()
 
 func destroy() -> void:
 	zone = Zone.GRAVE
 	var cell = get_parent() as Cell
 	if cell:
 		cell.occupied_gear = null
+	# Удаляем из списка на возврат, если была там
+	if game_manager and game_manager.game_state:
+		var idx = game_manager.game_state.tuning_to_reset.find(self)
+		if idx != -1:
+			game_manager.game_state.tuning_to_reset.remove_at(idx)
+	# Удаляем все модификаторы
+	if game_manager:
+		game_manager.game_state.effect_system.remove_modifiers_from_target(self)
+		game_manager.game_state.effect_system.remove_modifiers_from_source(self)
 	destroyed.emit(self)
 	queue_free()
 
+func get_current_resistance() -> int:
+	if type != GameEnums.GearType.CREATURE:
+		return 0
+	var bonus = 0
+	if game_manager:
+		bonus = game_manager.game_state.effect_system.get_resistance_bonus(self)
+	return resistance_base + bonus - damage_taken
+
 func take_damage(amount: int) -> void:
-	if is_face_up:
-		damage_taken += amount
-		if damage_taken >= max_ticks + max_tocks:
-			destroy()
-	else:
-		do_tock(amount)
+	if type != GameEnums.GearType.CREATURE:
+		if not is_face_up:
+			do_tock(amount)
+		return
+	damage_taken += amount
+	GameLogger.debug("%s takes %d damage, current resistance: %d" % [gear_name, amount, get_current_resistance()])
+	if game_manager:
+		game_manager.request_state_based_check()
 
 func can_rotate() -> bool:
 	return not is_face_up
@@ -216,7 +287,17 @@ func get_type_line() -> String:
 	var line = ""
 	if supertype != GameEnums.GearSupertype.NONE:
 		line += GameEnums.GearSupertype.keys()[supertype] + " "
-	line += GameEnums.GearType.keys()[type]
+	
+	match type:
+		GameEnums.GearType.ROUTINE:
+			line += "Routine"
+		GameEnums.GearType.CREATURE:
+			line += "Creature"
+		GameEnums.GearType.TUNING:
+			line += "Tuning"
+		GameEnums.GearType.INTERRUPT:
+			line += "Interrupt"
+	
 	if subtype != GameEnums.GearSubtype.NONE:
 		line += " — " + GameEnums.GearSubtype.keys()[subtype]
 	return line
@@ -226,32 +307,66 @@ func get_abilities_description() -> String:
 		return "No abilities"
 	var desc = ""
 	for slot in ability_slots:
+		if slot.ability.ability_id == GameEnums.AbilityID.STRIKE:
+			continue
 		var prefix = ""
 		match slot.type:
 			GameEnums.AbilityType.TRIGGERED:
 				prefix = "Triggered: "
 			GameEnums.AbilityType.ACTIVATED:
-				prefix = "Activated (%d T): " % slot.cost
+				# Для Interrupt карт показываем просто "Interrupt X"
+				if slot.ability.ability_id == GameEnums.AbilityID.INTERRUPT:
+					prefix = "Interrupt %d" % slot.cost
+				else:
+					prefix = "Activated (%d T): " % slot.cost
 			GameEnums.AbilityType.STATIC:
 				prefix = "Static: "
 		desc += prefix + slot.ability.description + "\n"
 	return desc.strip_edges()
 
 func get_tooltip_text() -> String:
+	var can_see_full = (owner_id == game_manager.game_state.active_player_id) or revealed
+	if not can_see_full:
+		var owner_str = "Player 1" if owner_id == 0 else "Player 2"
+		return "Unknown Gear (owned by %s)" % owner_str
+	
 	var owner_str = "Player 1" if owner_id == 0 else "Player 2"
 	var type_line = get_type_line()
 	var abilities_desc = get_abilities_description()
-	var base = "Gear: %s\n%s\nTocks: %d\nTicks: %d\nTime: %d\nOwner: %s" % [
-		gear_name, type_line, max_tocks, max_ticks, current_ticks, owner_str
+	
+	var type_str = ""
+	match type:
+		GameEnums.GearType.ROUTINE:
+			type_str = "Routine"
+		GameEnums.GearType.CREATURE:
+			type_str = "Creature"
+		GameEnums.GearType.TUNING:
+			type_str = "Tuning"
+		GameEnums.GearType.INTERRUPT:
+			type_str = "Interrupt"
+	
+	var base = "Gear: %s\nType: %s\n%s\nTocks: %d\nTicks: %d\nOwner: %s" % [
+		gear_name, type_str, type_line, max_tocks, max_ticks, owner_str
 	]
+	
+	if not is_face_up:
+		base += "\nTime: %d" % current_ticks
+	
 	if type == GameEnums.GearType.CREATURE:
 		base += "\nSpeed: %d" % speed
 		if is_flying:
 			base += "\nFlying"
-	if damage_taken > 0:
-		base += "\nDamage: %d/%d" % [damage_taken, max_ticks + max_tocks]
+		var current_res = get_current_resistance()
+		base += "\nImpact: %d\nResistance: %d (%d base, %d damage)" % [impact, current_res, resistance_base, damage_taken]
+		var bonus = 0
+		if game_manager:
+			bonus = game_manager.game_state.effect_system.get_resistance_bonus(self)
+		if bonus != 0:
+			base += " +%d bonus" % bonus
+	
 	if abilities_desc:
 		base += "\n\n%s" % abilities_desc
+	
 	return base
 
 func show_obverse_temporarily() -> void:
@@ -265,6 +380,7 @@ func show_obverse_temporarily() -> void:
 	if not is_face_up:
 		sprite.texture = original_texture
 		sprite.rotation_degrees = original_rotation
+	revealed = true
 
 func _on_click_area_input(viewport: Node, event: InputEvent, shape_idx: int) -> void:
 	if event is InputEventMouseButton and event.pressed:

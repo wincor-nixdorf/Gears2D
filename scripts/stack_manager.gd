@@ -78,6 +78,26 @@ func push_effect(ability: Ability, source: Gear, target: Object = null, context:
 		GameLogger.debug("Stack: pushed effect %s from %s at %s" % [ability.ability_name, source.gear_name, Game.pos_to_chess(source.board_position)])
 		_event_bus.stack_updated.emit(get_stack_snapshot())
 
+func push_effect_with_target(ability: Ability, source: Gear, context: Dictionary = {}) -> void:
+	if not source:
+		push_error("StackManager: push_effect_with_target called without source")
+		return
+	
+	var entry = StackEntry.new(ability, source, null, context)
+	
+	# Если способность требует цель, запрашиваем её сейчас
+	if ability.target_type != GameEnums.TargetType.NO_TARGET:
+		_pending_target_entry = entry
+		_event_bus.target_selection_requested.emit(ability, source, ability.get_possible_targets(context), context)
+		return
+	
+	# Если цель не требуется, добавляем в стек
+	if _batch_mode:
+		_pending_batch.append(entry)
+	else:
+		_stack.push_front(entry)
+		_event_bus.stack_updated.emit(get_stack_snapshot())
+		
 func _process_batch() -> void:
 	var active_id = _batch_active_player
 	var active_entries: Array[StackEntry] = []
@@ -93,27 +113,31 @@ func _process_batch() -> void:
 	
 	var active_ordered: Array[StackEntry] = []
 	if not active_entries.is_empty():
-		_event_bus.batch_ordering_requested.emit(active_id, active_entries)
-		var result = await _event_bus.batch_ordering_completed
-		active_ordered = result if result != null else active_entries
-		GameLogger.debug("Active player %d returned %d entries" % [active_id, active_ordered.size()])
+		if active_entries.size() == 1:
+			active_ordered = active_entries
+			GameLogger.debug("Active player %d has single entry, skipping order dialog" % active_id)
+		else:
+			_event_bus.batch_ordering_requested.emit(active_id, active_entries)
+			var result = await _event_bus.batch_ordering_completed
+			active_ordered = result if result != null else active_entries
+			GameLogger.debug("Active player %d returned %d entries" % [active_id, active_ordered.size()])
 	
 	var inactive_ordered: Array[StackEntry] = []
 	if not inactive_entries.is_empty():
-		_event_bus.batch_ordering_requested.emit(1 - active_id, inactive_entries)
-		var result = await _event_bus.batch_ordering_completed
-		inactive_ordered = result if result != null else inactive_entries
-		GameLogger.debug("Inactive player %d returned %d entries" % [1 - active_id, inactive_ordered.size()])
+		if inactive_entries.size() == 1:
+			inactive_ordered = inactive_entries
+			GameLogger.debug("Inactive player %d has single entry, skipping order dialog" % (1 - active_id))
+		else:
+			_event_bus.batch_ordering_requested.emit(1 - active_id, inactive_entries)
+			var result = await _event_bus.batch_ordering_completed
+			inactive_ordered = result if result != null else inactive_entries
+			GameLogger.debug("Inactive player %d returned %d entries" % [1 - active_id, inactive_ordered.size()])
 	
-	# Формируем стек: сначала активные (будут внизу), потом неактивные (сверху)
-	# Внутри каждой группы порядок прямой (первый в списке станет последним в своей группе из-за push_front)
 	_stack.clear()
 	
-	# Добавляем активные в прямом порядке (они окажутся внизу стека)
 	for i in range(active_ordered.size()):
 		_stack.push_front(active_ordered[i])
 	
-	# Добавляем неактивные в прямом порядке (они будут добавлены перед активными, т.е. сверху)
 	for i in range(inactive_ordered.size()):
 		_stack.push_front(inactive_ordered[i])
 	
@@ -137,6 +161,9 @@ func resolve_next() -> void:
 		if not _batch_in_progress:
 			_event_bus.stack_resolved.emit()
 			_event_bus.stack_updated.emit(get_stack_snapshot())
+			if _game_manager:
+				_game_manager.request_state_based_check()
+				_game_manager.reset_tuning_gears()
 		return
 	
 	var entry = _stack.pop_front()
@@ -144,35 +171,51 @@ func resolve_next() -> void:
 	_event_bus.stack_step_started.emit(entry_data)
 	GameLogger.debug("Stack: resolving effect %s from %s" % [entry.ability.ability_name, entry.source.gear_name])
 	
-	if entry.ability.target_type != GameEnums.TargetType.NO_TARGET and entry.target == null:
-		var possible_targets = entry.ability.get_possible_targets({"source_gear": entry.source})
-		if possible_targets.is_empty():
-			GameLogger.debug("Ability %s has no valid targets, skipping" % entry.ability.ability_name)
+	# Проверяем легальность цели (цель уже должна быть выбрана)
+	if entry.ability.target_type != GameEnums.TargetType.NO_TARGET:
+		if entry.target == null:
+			GameLogger.debug("Ability %s: no target selected, fizzles" % entry.ability.ability_name)
 			_event_bus.stack_step_finished.emit(entry_data)
 			_event_bus.stack_updated.emit(get_stack_snapshot())
 			if _stack.is_empty() and _pending_target_entry == null and not _batch_in_progress:
 				_event_bus.stack_resolved.emit()
+				if _game_manager:
+					_game_manager.request_state_based_check()
+					_game_manager.reset_tuning_gears()
 			return
 		
-		_pending_target_entry = entry
-		_event_bus.target_selection_started.emit()
-		GameLogger.debug("Stack: requesting target for %s" % entry.ability.ability_name)
-		_event_bus.target_selection_requested.emit(entry.ability, entry.source, possible_targets, {})
-		return
+		var possible_targets = entry.ability.get_possible_targets({"source_gear": entry.source})
+		if entry.target not in possible_targets:
+			GameLogger.debug("Ability %s: target is no longer legal, fizzles" % entry.ability.ability_name)
+			_event_bus.stack_step_finished.emit(entry_data)
+			_event_bus.stack_updated.emit(get_stack_snapshot())
+			if _stack.is_empty() and _pending_target_entry == null and not _batch_in_progress:
+				_event_bus.stack_resolved.emit()
+				if _game_manager:
+					_game_manager.request_state_based_check()
+					_game_manager.reset_tuning_gears()
+			return
 	
 	await _execute_entry(entry)
 	_event_bus.stack_step_finished.emit(entry_data)
 	_event_bus.stack_updated.emit(get_stack_snapshot())
 	if _stack.is_empty() and _pending_target_entry == null and not _batch_in_progress:
 		_event_bus.stack_resolved.emit()
+		if _game_manager:
+			_game_manager.request_state_based_check()
+			_game_manager.reset_tuning_gears()
 
 func _execute_entry(entry: StackEntry) -> void:
-	# Проверка легальности цели на момент разрешения
+	# Проверка, что цель всё ещё существует
+	if entry.target and not is_instance_valid(entry.target):
+		GameLogger.debug("Ability %s: target destroyed, fizzles" % entry.ability.ability_name)
+		return
+	
 	if entry.target != null and entry.ability.target_type != GameEnums.TargetType.NO_TARGET:
 		var possible_targets = entry.ability.get_possible_targets({"source_gear": entry.source})
 		if entry.target not in possible_targets:
 			GameLogger.debug("Ability %s: target is no longer legal, fizzles" % entry.ability.ability_name)
-			return  # способность проваливается
+			return
 	
 	var context = entry.context.duplicate()
 	context["source_gear"] = entry.source
@@ -180,6 +223,9 @@ func _execute_entry(entry: StackEntry) -> void:
 		context["target"] = entry.target
 	await entry.ability.execute(context)
 
+func has_pending_target() -> bool:
+	return _pending_target_entry != null
+	
 func _on_target_selected(target: Object) -> void:
 	if _pending_target_entry == null:
 		GameLogger.debug("Stack: target selected but no pending entry")
@@ -187,16 +233,27 @@ func _on_target_selected(target: Object) -> void:
 	
 	var entry = _pending_target_entry
 	_pending_target_entry = null
+	
+	# Проверяем, что цель легальна
+	var possible_targets = entry.ability.get_possible_targets({"source_gear": entry.source})
+	if target not in possible_targets:
+		GameLogger.debug("Ability %s: target is not legal, cancelling" % entry.ability.ability_name)
+		_event_bus.target_selection_cancelled.emit()
+		return
+	
 	entry.target = target
 	
+	# Убираем подсветку
 	_event_bus.target_selection_cancelled.emit()
 	
-	await _execute_entry(entry)
+	# Добавляем способность с выбранной целью в стек
+	if _batch_mode:
+		_pending_batch.append(entry)
+	else:
+		_stack.push_front(entry)
+		_event_bus.stack_updated.emit(get_stack_snapshot())
 	
-	_event_bus.stack_step_finished.emit(entry.to_dict())
-	_event_bus.stack_updated.emit(get_stack_snapshot())
-	if _stack.is_empty() and _pending_target_entry == null and not _batch_in_progress:
-		_event_bus.stack_resolved.emit()
+	GameLogger.debug("Stack: added effect %s from %s with target %s" % [entry.ability.ability_name, entry.source.gear_name, target])
 
 func _on_target_selection_cancelled() -> void:
 	if _pending_target_entry == null:
@@ -213,6 +270,9 @@ func clear_stack() -> void:
 
 func is_stack_empty() -> bool:
 	return _stack.is_empty() and _pending_target_entry == null
+
+func is_batch_active() -> bool:
+	return _batch_mode
 
 # --- Методы для восстановления из словарей ---
 func _find_ability_by_id(id: int) -> Ability:

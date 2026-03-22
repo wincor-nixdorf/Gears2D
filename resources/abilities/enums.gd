@@ -10,6 +10,8 @@ enum AbilityID {
 	WRATH_OF_GOD,
 	UPHEAVAL,
 	ACTIVATED_SPARK,
+	STRIKE,
+	INTERRUPT,
 }
 
 enum TriggerCondition {
@@ -20,6 +22,10 @@ enum TriggerCondition {
 	ON_TOCK,
 	ON_PHASE_START,
 	ON_PHASE_END,
+	ON_BEFORE_EMBED,
+	ON_AFTER_EMBED,
+	ON_BEFORE_RESOLVE,
+	ON_AFTER_RESOLVE,
 }
 
 enum AbilityType {
@@ -45,7 +51,8 @@ enum GearSupertype {
 enum GearType {
 	ROUTINE,
 	CREATURE,
-	TUNING
+	TUNING,
+	INTERRUPT
 }
 
 enum GearSubtype {

@@ -11,7 +11,7 @@ func _init(p_gear: Gear, gm: GameManager, gs: GameState) -> void:
 func can_execute() -> bool:
 	if not game_manager.stack_manager.is_stack_empty():
 		return false
-	if game_state.current_phase != Game.GamePhase.UPTURN:
+	if game_state.current_phase != Game.GamePhase.SWING_BACK:
 		return false
 	if gear.is_owned_by(game_state.active_player_id) or gear.is_face_up:
 		return false

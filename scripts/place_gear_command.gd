@@ -42,7 +42,9 @@ func execute() -> void:
 	game_state.t_pool[game_state.active_player_id] += 1
 	EventBus.t_pool_updated.emit(game_state.t_pool[0], game_state.t_pool[1])
 	
+	# Добавляем вершину в граф и эмитим сигнал для обновления визуалов цепочки
 	game_state.chain_graph.add_vertex(cell.board_pos)
+	EventBus.chain_built.emit(game_state.chain_graph.to_dict())
 	
 	game_state.has_placed_this_turn = true
 	game_state.moves_in_round += 1

@@ -4,6 +4,7 @@ extends CanvasLayer
 
 signal action_pressed
 signal hand_gear_selected(gear: Node2D)
+signal interrupt_played(gear: Gear, cell: Cell)
 
 @onready var stack_panel = %StackPanel
 @onready var player_label: Label = %PlayerLabel
@@ -31,17 +32,21 @@ signal hand_gear_selected(gear: Node2D)
 @onready var clear_log_button: Button = %ClearLogButton
 @onready var tooltip_icon: TextureRect = %TooltipIcon
 
-# Для временного диалога упорядочивания батча
+var turn_history_panel: TurnHistoryPanel
+var _target_selection_active: bool = false
+var _current_possible_targets: Array = []
+var _original_colors: Dictionary = {}
+var _active_player_id: int = 0
+var game_manager: GameManager
+
 var _batch_dialog: Window = null
 var _batch_entries: Array = []
 var _batch_player_id: int
 var _batch_ordered: Array = []
 var _batch_confirm_button: Button = null
 
-var _target_selection_active: bool = false
-var _current_possible_targets: Array = []
-var _original_colors: Dictionary = {}
-var _active_player_id: int = 0
+func set_game_manager(gm: GameManager) -> void:
+	game_manager = gm
 
 func _ready() -> void:
 	action_button.pressed.connect(_on_action_button_pressed)
@@ -63,6 +68,92 @@ func _ready() -> void:
 	
 	stack_panel.hide()
 	EventBus.stack_updated.connect(_on_stack_updated)
+	
+	_create_history_panel()
+
+func _create_history_panel() -> void:
+	turn_history_panel = TurnHistoryPanel.new()
+	turn_history_panel.name = "TurnHistoryPanel"
+	
+	turn_history_panel.anchor_left = 1.0
+	turn_history_panel.anchor_right = 1.0
+	turn_history_panel.anchor_top = 0.0
+	turn_history_panel.anchor_bottom = 1.0
+	
+	turn_history_panel.offset_left = -1700
+	turn_history_panel.offset_right = -1110
+	turn_history_panel.offset_top = 340
+	turn_history_panel.offset_bottom = -300
+	
+	turn_history_panel.modulate = Color(0.424, 0.427, 0.439, 0.855)
+	turn_history_panel.z_index = 100
+	
+	turn_history_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	turn_history_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	
+	var vbox = VBoxContainer.new()
+	vbox.name = "VBoxContainer"
+	vbox.anchor_right = 1.0
+	vbox.anchor_bottom = 1.0
+	turn_history_panel.add_child(vbox)
+	
+	var hbox = HBoxContainer.new()
+	hbox.name = "HBoxContainer"
+	vbox.add_child(hbox)
+	
+	var title = Label.new()
+	title.text = "Turn History"
+	title.add_theme_font_size_override("font_size", 16)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hbox.add_child(title)
+	
+	var clear_btn = Button.new()
+	clear_btn.name = "ClearButton"
+	clear_btn.text = "Clear"
+	hbox.add_child(clear_btn)
+	
+	var export_btn = Button.new()
+	export_btn.name = "ExportButton"
+	export_btn.text = "Export"
+	hbox.add_child(export_btn)
+	
+	var close_btn = Button.new()
+	close_btn.name = "CloseButton"
+	close_btn.text = "X"
+	close_btn.custom_minimum_size = Vector2(30, 0)
+	hbox.add_child(close_btn)
+	
+	var scroll = ScrollContainer.new()
+	scroll.name = "ScrollContainer"
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vbox.add_child(scroll)
+	
+	var tree = Tree.new()
+	tree.name = "Tree"
+	scroll.add_child(tree)
+	
+	add_child(turn_history_panel)
+	
+	turn_history_panel.history_tree = tree
+	turn_history_panel.clear_button = clear_btn
+	turn_history_panel.export_button = export_btn
+	turn_history_panel.close_button = close_btn
+	
+	turn_history_panel.visible = true
+	
+	var show_btn = Button.new()
+	show_btn.text = "📜 History"
+	show_btn.position = Vector2(10, 10)
+	show_btn.pressed.connect(_on_show_history_pressed)
+	add_child(show_btn)
+
+func _on_show_history_pressed() -> void:
+	if turn_history_panel:
+		turn_history_panel.visible = not turn_history_panel.visible
+
+func setup_turn_history(history_manager: TurnHistoryManager) -> void:
+	if turn_history_panel:
+		turn_history_panel.setup(history_manager)
 
 func _on_stack_updated(snapshot: Array):
 	if snapshot.is_empty():
@@ -71,18 +162,49 @@ func _on_stack_updated(snapshot: Array):
 		stack_panel.show()
 
 func _input(event: InputEvent) -> void:
-	if not _target_selection_active:
+	# Если активен выбор цели
+	if _target_selection_active:
+		if event is InputEventMouseButton and event.pressed:
+			if event.button_index == MOUSE_BUTTON_RIGHT:
+				EventBus.target_selection_cancelled.emit()
+				get_viewport().set_input_as_handled()
+				return
+			elif event.button_index == MOUSE_BUTTON_LEFT:
+				var clicked_object = _get_clicked_object()
+				if clicked_object and clicked_object in _current_possible_targets:
+					EventBus.target_selected.emit(clicked_object)
+					_clear_target_selection()
+					get_viewport().set_input_as_handled()
+					return
 		return
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
-		EventBus.target_selection_cancelled.emit()
-		get_viewport().set_input_as_handled()
+	
+	# Если выбран Interrupt - обрабатываем клик по клетке
+	if game_manager and game_manager.game_state.selected_interrupt_gear:
+		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			var clicked_object = _get_clicked_object()
+			if clicked_object is Cell:
+				var available = get_interrupt_available_cells(game_manager.game_state.selected_interrupt_gear)
+				if clicked_object in available:
+					GameLogger.debug("UI: Interrupt placement on valid cell %s" % Game.pos_to_chess(clicked_object.board_pos))
+					interrupt_played.emit(game_manager.game_state.selected_interrupt_gear, clicked_object)
+					get_viewport().set_input_as_handled()
+					return
+				else:
+					GameLogger.debug("UI: Invalid cell for interrupt, cancelling selection")
+					_cancel_interrupt_selection()
+					get_viewport().set_input_as_handled()
+					return
 		return
+	
+	# Обычная обработка кликов для других действий
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		var clicked_object = _get_clicked_object()
-		if clicked_object and clicked_object in _current_possible_targets:
-			EventBus.target_selected.emit(clicked_object)
-			_clear_target_selection()
-			get_viewport().set_input_as_handled()
+		if clicked_object is Gear and game_manager and not game_manager.stack_manager.is_stack_empty():
+			# Проверяем, можно ли кликнуть по Gear (например, для снятия T)
+			var cmd = TakeTCommand.new(clicked_object, 1, game_manager, game_manager.game_state)
+			if cmd.can_execute():
+				# Будет обработано в handle_gear_clicked
+				pass
 
 func _on_action_button_pressed() -> void:
 	action_pressed.emit()
@@ -95,7 +217,15 @@ func update_player(active_player_id: int) -> void:
 	player_label.text = "Active Player: " + str(active_player_id + 1)
 
 func update_phase(phase: Game.GamePhase) -> void:
-	var phase_names = ["Chain Building", "Upturn", "Resolution", "Renewal"]
+	var phase_names = [
+		"Upkeep",
+		"Draw",
+		"Chain Building",
+		"Swing Back",
+		"Resolution",
+		"End",
+		"Cleanup"
+	]
 	phase_label.text = "Phase: " + phase_names[phase]
 
 func update_t_pool(t0: int, t1: int) -> void:
@@ -110,21 +240,17 @@ func update_action_button(phase: Game.GamePhase, placed: bool, active_player_id:
 	
 	match phase:
 		Game.GamePhase.CHAIN_BUILDING:
-			if placed:
-				action_button.text = "End Turn (Player " + str(active_player_id + 1) + ")"
-				action_button.disabled = false
-			else:
-				action_button.text = "Pass"
-				action_button.disabled = not can_pass
-		Game.GamePhase.UPTURN:
-			action_button.text = "End Peek"
+			action_button.text = "Pass"
+			action_button.disabled = not can_pass
+		Game.GamePhase.SWING_BACK:
+			action_button.text = "End Swing Back"
 			action_button.disabled = false
 		Game.GamePhase.CHAIN_RESOLUTION:
 			action_button.text = "Skip"
 			action_button.disabled = false
 		_:
 			action_button.text = "Action"
-			action_button.disabled = false
+			action_button.disabled = true
 
 func update_round(round: int) -> void:
 	round_label.text = "Round: " + str(round)
@@ -175,26 +301,51 @@ func fill_hand_container(container: HBoxContainer, hand: Array, is_active: bool,
 		if gear.type == GameEnums.GearType.CREATURE and gear.speed > 0:
 			speed_text = "\nSpeed: %d" % gear.speed
 		
-		var text = "%s\n%s\nTocks: %d Ticks: %d Time: %d%s\n%s" % [
+		var interrupt_cost_text = ""
+		if gear.type == GameEnums.GearType.INTERRUPT:
+			var cost = gear.get_interrupt_cost()
+			interrupt_cost_text = "\nCost: %d T" % cost
+		
+		var text = "%s\n%s\nTocks: %d Ticks: %d Time: %d%s%s\n%s" % [
 			gear.gear_name,
 			type_line,
 			gear.max_tocks,
 			gear.max_ticks,
 			gear.current_ticks,
 			speed_text,
+			interrupt_cost_text,
 			abilities_text
 		]
 		button.text = text
 		button.set_meta("gear", gear)
 		
-		if is_active:
-			if stack_empty:
-				button.pressed.connect(_on_hand_button_pressed.bind(gear))
-				button.mouse_entered.connect(_on_hand_button_mouse_entered.bind(gear))
-				button.mouse_exited.connect(_on_hand_button_mouse_exited)
+		# Определяем, можно ли использовать карту
+		var can_use = false
+		
+		# В фазе Resolution Interrupt карты активны
+		if gear.type == GameEnums.GearType.INTERRUPT and game_manager and game_manager.game_state.current_phase == Game.GamePhase.CHAIN_RESOLUTION:
+			# Interrupt может сыграть игрок, у которого есть приоритет (не обязательно активный)
+			# Проверяем, что waiting_for_player активен и priority_player совпадает с владельцем карты
+			can_use = game_manager.game_state.waiting_for_player and game_manager.game_state.priority_player == player_id and game_manager.game_state.selected_interrupt_gear == null
+			if can_use:
+				GameLogger.debug("Interrupt card %s is ACTIVE for player %d" % [gear.gear_name, player_id])
 			else:
-				button.disabled = true
-				button.modulate = Color(0.7, 0.7, 0.7)
+				GameLogger.debug("Interrupt card %s is INACTIVE for player %d: waiting=%s, priority=%d, selected=%s" % [gear.gear_name, player_id, game_manager.game_state.waiting_for_player, game_manager.game_state.priority_player, game_manager.game_state.selected_interrupt_gear])
+		# В фазе Chain Building обычные карты активны ТОЛЬКО в шаге Embed
+		elif game_manager and game_manager.game_state.current_phase == Game.GamePhase.CHAIN_BUILDING:
+			var phase_machine = game_manager.phase_machine
+			if phase_machine and phase_machine.current_phase is ChainBuildingPhase:
+				var chain_phase = phase_machine.current_phase as ChainBuildingPhase
+				can_use = is_active and stack_empty and chain_phase.is_embed_step()
+		else:
+			can_use = is_active and stack_empty
+		
+		if can_use:
+			button.pressed.connect(_on_hand_button_pressed.bind(gear))
+			button.mouse_entered.connect(_on_hand_button_mouse_entered.bind(gear))
+			button.mouse_exited.connect(_on_hand_button_mouse_exited)
+			button.disabled = false
+			button.modulate = Color.WHITE
 		else:
 			button.disabled = true
 			button.modulate = Color(0.7, 0.7, 0.7)
@@ -204,6 +355,20 @@ func fill_hand_container(container: HBoxContainer, hand: Array, is_active: bool,
 		container.add_child(button)
 
 func _on_hand_button_pressed(gear: Node2D) -> void:
+	GameLogger.debug("UI._on_hand_button_pressed: gear=%s, type=%s" % [gear.gear_name, gear.type])
+	
+	# Если в фазе Resolution и это Interrupt, выбираем для Interrupt
+	if game_manager and game_manager.game_state.current_phase == Game.GamePhase.CHAIN_RESOLUTION:
+		if gear is Gear and gear.type == GameEnums.GearType.INTERRUPT:
+			GameLogger.debug("Interrupt card clicked: waiting=%s, priority=%d, owner=%d" % [game_manager.game_state.waiting_for_player, game_manager.game_state.priority_player, gear.owner_id])
+			if game_manager.game_state.waiting_for_player and game_manager.game_state.priority_player == gear.owner_id:
+				GameLogger.debug("Selecting interrupt gear %s" % gear.gear_name)
+				select_interrupt_gear(gear)
+				return
+			else:
+				GameLogger.warning("Cannot play Interrupt - not your priority")
+				return
+	
 	hand_gear_selected.emit(gear)
 
 func _on_hand_button_mouse_entered(gear: Gear) -> void:
@@ -317,7 +482,6 @@ func _on_target_selection_requested(ability: Ability, source: Gear, possible_tar
 	if _target_selection_active:
 		GameLogger.debug("UI: target selection already active, ignoring new request for ability %s" % ability.ability_name)
 		return
-	GameLogger.debug("UI: target selection requested for ability %s" % ability.ability_name)
 	_target_selection_active = true
 	_current_possible_targets = possible_targets
 	
@@ -328,7 +492,6 @@ func _on_target_selection_requested(ability: Ability, source: Gear, possible_tar
 	prompt_label.text = prompt_text
 
 func _on_target_selection_cancelled() -> void:
-	GameLogger.debug("UI: target selection cancelled")
 	_clear_target_selection()
 
 func cancel_target_selection() -> void:
@@ -348,16 +511,14 @@ func _highlight_possible_targets(targets: Array) -> void:
 		if target is Cell:
 			_original_colors[target] = target.sprite.modulate
 			target.sprite.modulate = Color.GREEN
-			GameLogger.debug("UI: highlighting cell at %s" % target.board_pos)
 		elif target is Gear:
 			_original_colors[target] = target.modulate
 			target.modulate = Color.GREEN
-			GameLogger.debug("UI: highlighting gear %s at %s" % [target.gear_name, target.board_position])
+			GameLogger.debug("Highlighting gear %s at %s" % [target.gear_name, Game.pos_to_chess(target.board_position)])
 		elif target is Player:
 			var button = player0_button if target.player_id == 0 else player1_button
 			_original_colors[target] = button.modulate
 			button.modulate = Color.GREEN
-			GameLogger.debug("UI: highlighting player %d button" % target.player_id)
 
 func _restore_highlights() -> void:
 	for obj in _original_colors:
@@ -365,14 +526,11 @@ func _restore_highlights() -> void:
 			continue
 		if obj is Cell:
 			obj.sprite.modulate = _original_colors[obj]
-			GameLogger.debug("UI: restoring cell at %s" % obj.board_pos)
 		elif obj is Gear:
 			obj.modulate = _original_colors[obj]
-			GameLogger.debug("UI: restoring gear %s" % obj.gear_name)
 		elif obj is Player:
 			var button = player0_button if obj.player_id == 0 else player1_button
 			button.modulate = _original_colors[obj]
-			GameLogger.debug("UI: restoring player %d button" % obj.player_id)
 	_original_colors.clear()
 
 func _get_clicked_object():
@@ -406,10 +564,64 @@ func is_target_selection_active() -> bool:
 func is_valid_target(obj: Object) -> bool:
 	return obj in _current_possible_targets
 
-# ---------- Обработка батча (только упорядочивание, без выбора целей) ----------
-func _on_batch_ordering_requested(player_id: int, entries: Array) -> void:
-	GameLogger.debug("UI: batch ordering requested for player %d with %d entries" % [player_id, entries.size()])
+func select_interrupt_gear(gear: Gear) -> void:
+	if not game_manager:
+		GameLogger.error("UI: game_manager not set")
+		return
 	
+	if game_manager.game_state.current_phase != Game.GamePhase.CHAIN_RESOLUTION:
+		GameLogger.warning("Can only play Interrupt during resolution phase")
+		return
+	
+	GameLogger.debug("Selecting interrupt gear %s for player %d" % [gear.gear_name, gear.owner_id])
+	game_manager.game_state.selected_interrupt_gear = gear
+	highlight_gear(gear)
+	
+	var available_cells = get_interrupt_available_cells(gear)
+	GameLogger.debug("Available cells for interrupt: %d" % available_cells.size())
+	for cell in available_cells:
+		cell.sprite.modulate = Color(1, 0.5, 0)
+	
+	var cost = gear.get_interrupt_cost()
+	prompt_label.text = "Select a cell adjacent to the resolving gear to place Interrupt (cost: %d T)" % cost
+
+func get_interrupt_available_cells(gear: Gear) -> Array[Cell]:
+	var result: Array[Cell] = []
+	
+	if not game_manager:
+		return result
+	
+	var current_pos = game_manager.game_state.current_resolve_pos
+	
+	if current_pos == Vector2i(-1, -1):
+		return result
+	
+	var board_manager = game_manager.board_manager
+	var neighbors = board_manager.get_neighbors(current_pos)
+	
+	for pos in neighbors:
+		var cell = board_manager.get_cell(pos)
+		if cell and cell.is_empty():
+			if (gear.owner_id == 0 and cell.is_white()) or (gear.owner_id == 1 and cell.is_black()):
+				result.append(cell)
+	
+	return result
+
+func _cancel_interrupt_selection() -> void:
+	if game_manager and game_manager.game_state.selected_interrupt_gear:
+		var gear = game_manager.game_state.selected_interrupt_gear
+		var available_cells = get_interrupt_available_cells(gear)
+		for cell in available_cells:
+			if cell.is_white():
+				cell.sprite.modulate = Color(1, 1, 1, 0.8)
+			else:
+				cell.sprite.modulate = Color(0.2, 0.2, 0.2, 0.8)
+		
+		unhighlight_gear(gear)
+		game_manager.game_state.selected_interrupt_gear = null
+		prompt_label.text = ""
+
+func _on_batch_ordering_requested(player_id: int, entries: Array) -> void:
 	if _batch_dialog and is_instance_valid(_batch_dialog):
 		_batch_dialog.queue_free()
 		_batch_dialog = null
@@ -496,14 +708,12 @@ func _move_entry(index: int, delta: int, list_container: VBoxContainer) -> void:
 	_update_batch_list(list_container)
 
 func _on_batch_confirm(list_container: VBoxContainer) -> void:
-	GameLogger.debug("UI: batch confirmed with %d entries" % _batch_ordered.size())
 	if _batch_dialog:
 		_batch_dialog.queue_free()
 		_batch_dialog = null
 	EventBus.batch_ordering_completed.emit(_batch_ordered)
 
 func _on_batch_cancel() -> void:
-	GameLogger.debug("UI: batch cancelled, returning original order")
 	if _batch_dialog:
 		_batch_dialog.queue_free()
 		_batch_dialog = null

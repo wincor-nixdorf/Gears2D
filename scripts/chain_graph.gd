@@ -24,6 +24,11 @@ func remove_vertex(pos: Vector2i) -> void:
 
 # Добавить ребро между двумя вершинами, возвращает ID ребра
 func add_edge(pos1: Vector2i, pos2: Vector2i) -> int:
+	# Проверка ортогональности (только соседи по прямой, не по диагонали)
+	if abs(pos1.x - pos2.x) + abs(pos1.y - pos2.y) != 1:
+		push_error("ChainGraph: Attempted to add non-orthogonal edge between %s and %s" % [pos1, pos2])
+		return -1
+	
 	# Убедимся, что обе вершины существуют
 	add_vertex(pos1)
 	add_vertex(pos2)

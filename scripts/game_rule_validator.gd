@@ -68,12 +68,8 @@ func get_available_cells() -> Array[Cell]:
 			GameLogger.debug("get_available_cells: board empty, start positions: %s" % str(start_positions))
 			for pos in start_positions:
 				var cell = board_manager.get_cell(pos)
-				if cell:
-					GameLogger.debug("Cell %s exists, is_empty = %s" % [pos, cell.is_empty()])
-					if cell.is_empty():
-						result.append(cell)
-				else:
-					GameLogger.debug("Cell %s is null!" % pos)
+				if cell and cell.is_empty():
+					result.append(cell)
 			GameLogger.debug("get_available_cells: returning %d cells" % result.size())
 			return result
 		else:
@@ -110,7 +106,7 @@ func get_available_cells() -> Array[Cell]:
 		var cell = board_manager.get_cell(n)
 		if not cell:
 			continue
-		# Проверка цвета клетки
+		# Проверка цвета клетки (для текущего активного игрока)
 		var color_ok = (game_state.active_player_id == 0 and cell.is_white()) or (game_state.active_player_id == 1 and cell.is_black())
 		if not color_ok:
 			continue
@@ -119,7 +115,7 @@ func get_available_cells() -> Array[Cell]:
 			result.append(cell)
 			continue
 		# Занятая клетка – можно использовать только свою шестерню, если ещё нет прямого ребра
-		if cell.occupied_gear.is_owned_by(game_state.active_player_id):
+		if cell.occupied_gear and cell.occupied_gear.is_owned_by(game_state.active_player_id):
 			var has_direct_edge = game_state.chain_graph.has_edge(game_state.last_cell_pos, n)
 			if not has_direct_edge:
 				result.append(cell)

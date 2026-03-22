@@ -1,4 +1,4 @@
-# game_initializer.gd (полный код с использованием AbilitySlotData)
+# game_initializer.gd
 class_name GameInitializer
 extends RefCounted
 
@@ -74,6 +74,8 @@ func load_decks_from_json(path: String) -> Array[GearData]:
 				gd.type = GameEnums.GearType.CREATURE
 			"Tuning":
 				gd.type = GameEnums.GearType.TUNING
+			"Interrupt":
+				gd.type = GameEnums.GearType.INTERRUPT
 			_:
 				gd.type = GameEnums.GearType.ROUTINE
 		
@@ -98,6 +100,8 @@ func load_decks_from_json(path: String) -> Array[GearData]:
 		
 		gd.speed = entry.get("speed", 0)
 		gd.is_flying = entry.get("is_flying", false)
+		gd.impact = entry.get("impact", 0)
+		gd.resistance = entry.get("resistance", 0)
 		
 		var reverse_path = entry.get("texture_reverse", "")
 		var obverse_path = entry.get("texture_obverse", "")
@@ -148,6 +152,10 @@ func create_ability_by_id(id: int) -> Ability:
 			script_path = "res://resources/abilities/upheaval_ability.gd"
 		GameEnums.AbilityID.ACTIVATED_SPARK:
 			script_path = "res://resources/abilities/spark_ability.gd"
+		GameEnums.AbilityID.STRIKE:
+			script_path = "res://resources/abilities/strike_ability.gd"
+		GameEnums.AbilityID.INTERRUPT:
+			script_path = "res://resources/abilities/interrupt_ability.gd"
 		_:
 			return null
 	
